@@ -1,0 +1,6 @@
+{
+  "name": "创联世界",
+  "description": "创联世界 - 虚拟地缘战略与国家外交推演系统，提供工作区创作、国家建设、外交博弈、军事工业与世界地图推演平台。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
