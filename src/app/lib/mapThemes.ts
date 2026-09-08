@@ -137,14 +137,14 @@ export function toModernMapColor(colorHex?: string, theme: MapVisualTheme = 'whi
   }
 
   if (theme === 'white') {
-    // 白色主题：饱满雅致、辨识度极高的水彩版图色（饱和度 58%，明度 84%）
-    const sat = delta === 0 ? 8 : 58;
-    const light = 84;
+    // 白色主题：饱满雅致、对比鲜明的地缘政治水彩版图色（饱和度 66%，明度 76%）
+    const sat = delta === 0 ? 8 : 66;
+    const light = 76;
     return `hsl(${Math.round(hue)}, ${sat}%, ${light}%)`;
   } else {
     // 战术深色主题：沉稳的暗色调军用沙盘主权着色，避免过度刺眼，让暗色质感贯穿全省份
-    const sat = delta === 0 ? 10 : 45;
-    const light = 26;
+    const sat = delta === 0 ? 10 : 50;
+    const light = 28;
     return `hsl(${Math.round(hue)}, ${sat}%, ${light}%)`;
   }
 }

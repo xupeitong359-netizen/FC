@@ -541,17 +541,16 @@ export function checkProvincesContiguity(
 
 /**
  * 获取建国圈地模式下当前可合法选取的省份 ID 集合。
- * - 当未选择任何省份时（selectedProvinces 为空），所有未被占领的省份均可作为初始省份。
- * - 当已有已选省份时，只有与当前已选省份相邻且未被占领的地块才可被选中（已选省份也包含在内以支持取消选中）。
+ * - 用户取消了只能沿相邻省份选择的限制，所有未被其它国家占领的省份或本国已选省份均可合法选取。
  */
 export function getValidCreationProvinceIds(
   selectedProvinces: Array<ProvinceData | { id: string | number; name?: string }>,
   allNations: Nation[]
 ): Set<string> {
   const validSet = new Set<string>();
-  const { featureMetas, adjacencyMap, featureById, featureByName } = initMapIndex();
+  const { featureMetas, featureById, featureByName } = initMapIndex();
 
-  // Collect occupied provinces from other nations
+  // 收集其它国家已占领的省份
   const occupiedIds = new Set<string>();
   for (const n of allNations) {
     for (const p of n.provinces || []) {
@@ -567,52 +566,27 @@ export function getValidCreationProvinceIds(
     }
   }
 
-  // If no province is selected yet, all unowned provinces are valid starting points
-  if (!selectedProvinces || selectedProvinces.length === 0) {
-    for (const m of featureMetas) {
-      if (!occupiedIds.has(m.stateId)) {
-        validSet.add(m.stateId);
-        validSet.add(m.name.trim().toLowerCase());
-        validSet.add(m.chineseName.trim().toLowerCase());
+  // 取消相邻限制：所有未被占领的省份均可作为合法圈选目标（不限是否相邻）
+  for (const m of featureMetas) {
+    if (!occupiedIds.has(m.stateId)) {
+      validSet.add(m.stateId);
+      validSet.add(m.name.trim().toLowerCase());
+      validSet.add(m.chineseName.trim().toLowerCase());
+    }
+  }
+
+  // 确保已选择的省份也在集合中，以支持反选（移出）
+  if (selectedProvinces && selectedProvinces.length > 0) {
+    for (const p of selectedProvinces) {
+      if (p.id !== undefined && p.id !== null) {
+        validSet.add(String(p.id));
+        const meta = featureById.get(String(p.id));
+        if (meta) validSet.add(meta.stateId);
       }
-    }
-    return validSet;
-  }
-
-  // For already selected provinces, find all unowned adjacent neighbors
-  const selectedStateIds = new Set<string>();
-  for (const p of selectedProvinces) {
-    let meta: FeatureMeta | undefined;
-    if (p.id !== undefined && p.id !== null) {
-      const pid = String(p.id).trim();
-      meta = featureById.get(pid) || featureByName.get(pid.toLowerCase());
-    }
-    if (!meta && p.name) {
-      const pname = p.name.trim().toLowerCase();
-      meta = featureByName.get(pname) || featureById.get(pname);
-    }
-    const stateId = meta ? meta.stateId : String(p.id);
-    selectedStateIds.add(stateId);
-    // Also include already selected provinces in validSet so they can be deselected
-    validSet.add(stateId);
-    if (meta) {
-      validSet.add(meta.name.trim().toLowerCase());
-      validSet.add(meta.chineseName.trim().toLowerCase());
-    }
-  }
-
-  for (const stateId of selectedStateIds) {
-    const neighbors = adjacencyMap.get(stateId);
-    if (neighbors) {
-      for (const neighborId of neighbors) {
-        if (!occupiedIds.has(neighborId)) {
-          validSet.add(neighborId);
-          const meta = featureById.get(neighborId);
-          if (meta) {
-            validSet.add(meta.name.trim().toLowerCase());
-            validSet.add(meta.chineseName.trim().toLowerCase());
-          }
-        }
+      if (p.name) {
+        validSet.add(p.name.trim().toLowerCase());
+        const meta = featureByName.get(p.name.trim().toLowerCase());
+        if (meta) validSet.add(meta.stateId);
       }
     }
   }

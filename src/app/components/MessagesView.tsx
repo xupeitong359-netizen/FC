@@ -1,32 +1,27 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  MessageSquare,
-  Send,
+  Mail,
+  User as UserIcon,
+  Handshake,
   Bell,
-  ShieldCheck,
-  AlertTriangle,
-  Swords,
-  Sparkles,
+  FileText,
+  Search,
+  MoreHorizontal,
+  Archive,
+  ChevronRight,
   CheckCheck,
   Trash2,
-  Filter,
-  Search,
-  ChevronRight,
-  Clock,
-  User as UserIcon,
-  Plus,
   X,
-  FileText,
-  Radio,
-  Share2,
+  Send,
   Check,
-  ArrowUpRight,
-  Globe2,
+  RotateCcw,
+  Sparkles,
+  Shield,
+  Clock,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Nation, AppNotification } from '../types';
-import { api } from '../services/api';
-import { useAppSettings } from '../services/settingsService';
+import { User, Nation, AllianceFaction } from '../types';
+import { strategicStorage } from '../services/strategicGameplayService';
 
 interface MessagesViewProps {
   user: User | null;
@@ -37,78 +32,280 @@ interface MessagesViewProps {
   showToast: (msg: string) => void;
 }
 
-export type MessageCategory = 'all' | 'diplomacy' | 'war' | 'community' | 'system';
+export type MessageCategory = 'all' | 'private' | 'diplomacy' | 'system' | 'national_affairs';
 
-interface ExtendedMessage {
+export interface DispatchMessage {
   id: string;
   category: MessageCategory;
+  categoryLabel: '私人' | '外交' | '系统' | '国家事务';
   title: string;
   senderName: string;
-  senderAvatar?: string;
-  senderTag?: string;
+  time: string;
   summary: string;
   content: string;
-  timestamp: string;
-  isRead: boolean;
-  priority?: 'high' | 'normal' | 'urgent';
-  relatedNationId?: string;
-  actionType?: 'view_diplomacy' | 'view_war' | 'follow_back' | 'view_profile' | 'none';
+  unreadCount?: number;
+  hasRedDot?: boolean;
+  isOnline?: boolean;
+  isAllianceInvite?: boolean;
+  avatarType: 'compass' | 'eagle' | 'lion' | 'palace' | 'un' | 'anime' | 'fortress';
+  isArchived?: boolean;
+  actionTaken?: 'accepted' | 'declined' | null;
 }
 
-const PRESET_MESSAGES: ExtendedMessage[] = [
+// 对应参考图的 7 条初始基准消息
+const INITIAL_MESSAGES: DispatchMessage[] = [
   {
-    id: 'msg-seed-1',
+    id: 'msg_bjtm',
     category: 'diplomacy',
-    title: '【最高通报】关于签署《泛大陆和平互不侵犯条约》之国书照会',
-    senderName: '大韩民国 · 外务总省',
-    senderTag: '主权粉陆照会',
-    summary: '提议在第 142 演算周期内设立中立边境非军事区，并全面恢复关税互惠互免。',
-    content: `致崇高的领主及战略阁下：\n\n鉴于当前地缘走廊局势更迭，为防范边境防卫圈突发摩擦，本国最高防卫评议会决议向贵国提议建立《泛大陆和平互不侵犯条约》。\n\n条约核心要项：\n1. 双方陆上边境接壤省份撤出重装装甲师主力；\n2. 设立 50 公里常态化空域监视巡弋走廊；\n3. 互相开放稀有合金与能源贸易通道。\n\n盼请尽快签署或驳回本公牒。`,
-    timestamp: '10分钟前',
-    isRead: false,
-    priority: 'urgent',
-    actionType: 'view_diplomacy',
+    categoryLabel: '外交',
+    title: '北境同盟',
+    senderName: '北境同盟最高评议会',
+    time: '20:14',
+    summary: '关于边境贸易协定的进一步磋商...',
+    content: `致崇高执政官阁下：\n\n鉴于北境地缘走廊常态化通商量大幅攀升，我邦统帅部提议在下一演算周期内签订《边境自贸互免关税协定》。\n\n协定要项包括：\n1. 边境接壤省份设立免检通关绿色通道；\n2. 互派商贸武官常驻以处置突发经贸摩擦；\n3. 互相开放紧缺战略工业矿产平价采购配额。\n\n盼请贵邦审议并尽早交换国书。`,
+    unreadCount: 2,
+    isOnline: true,
+    avatarType: 'compass',
   },
   {
-    id: 'msg-seed-2',
-    category: 'war',
-    title: '【前沿战况警报】北部走廊要冲爆发局部装甲巡弋冲突',
-    senderName: '地缘统帅部·推演预警',
-    senderTag: 'DEFENSE-ALERT',
-    summary: '边境雷达矩阵监测到异动，请迅速检查军工生产线与师团驻扎阵列。',
-    content: `紧急战略通报：\n\n前线雷达侦测站网于 06:15 分捕捉到未报备的机动装甲集群动向。当前边境摩擦系数上升至 42%。\n\n参谋部建议：\n- 立即核查前沿补给站储备。\n- 将步兵师由待命状态调整为边境警戒巡逻。\n- 前往作战厅查阅最新态势图。`,
-    timestamp: '35分钟前',
-    isRead: false,
-    priority: 'high',
-    actionType: 'view_war',
+    id: 'msg_dlghg',
+    category: 'private',
+    categoryLabel: '私人',
+    title: '东陆共和国',
+    senderName: '东陆共和国特使 · 顾远',
+    time: '18:27',
+    summary: '感谢你的来信，我们期待在下次会议中...',
+    content: `领主阁下：\n\n感谢你的亲笔来信！我们在近日的沙盘推演中，注意到了贵邦对于民用工厂与军工生产线的平衡构筑极具战略前瞻性。\n\n我们期待在下次多边圆桌磋商中，能就前线装甲师编制配比深入交换心得。祝沙盘推演顺利，国运昌隆！`,
+    unreadCount: 1,
+    avatarType: 'eagle',
   },
   {
-    id: 'msg-seed-3',
-    category: 'community',
-    title: '创作者 @龙神 赞同了您的沙盘构想，并申请加入互关联盟',
-    senderName: '创作者 @龙神',
-    senderTag: '架构师同行',
-    summary: '“您的粉陆设定极其硬核，期待在下一期跨次元沙盘大演练中并肩作战！”',
-    content: `你好！在创作者大厅看到了你刚刚发布的粉陆设定，工业产值配比和国策树逻辑非常严谨，很有代入感！\n\n已为您点赞支持，并递交了互相关注文书。希望后续能合作联创一张更大维度的全球演化沙盘！`,
-    timestamp: '2小时前',
-    isRead: false,
-    priority: 'normal',
-    actionType: 'follow_back',
+    id: 'msg_nfwg',
+    category: 'diplomacy',
+    categoryLabel: '外交',
+    title: '南风王国',
+    senderName: '南风王国外务总省',
+    time: '16:03',
+    summary: '已向你发送 同盟邀请',
+    content: `【最高同盟公约缔结公文】\n\n尊敬的执政阁下：\n\n南风王国正式向贵国递交同盟公约缔结照会！\n\n根据推演公约法案，同盟规模上限严格限制为最多 3 个国家。若完成签署，同盟双方将享有：\n- 全域共同防御：任一盟友遭受侵略将自动触发防卫义务；\n- 边境免除关税与战略资源互补调配；\n- 联合参谋部作战经验值（XP）互通共享。\n\n请阁下在战略决策中审议批准。`,
+    hasRedDot: true,
+    isAllianceInvite: true,
+    avatarType: 'lion',
   },
   {
-    id: 'msg-seed-4',
+    id: 'msg_xhlb',
+    category: 'national_affairs',
+    categoryLabel: '国家事务',
+    title: '星海联邦',
+    senderName: '星海联邦统筹委员会',
+    time: '昨天',
+    summary: '我们已完成本周的联合开发计划，...',
+    content: `全域内政与基建联合简报：\n\n本周跨省联合基础工程已全线竣工验收。全域 12 个重点工业省份的民用工场配额已按计划调配完毕，民工投产速度提升 12.5%，战略资源储量保持充盈。\n\n请各省长官持续密切监视省份治安镇压与稳定度指数。`,
+    avatarType: 'palace',
+  },
+  {
+    id: 'msg_sjyh',
     category: 'system',
-    title: '【推演引擎】全局物理模拟与地缘渲染参数已更新就绪',
-    senderName: '沙盘推演内核 60FPS',
-    senderTag: 'KERNEL-OK',
-    summary: '白纸舆图底层矢量瓦片渲染完毕，全域 193 块粉陆经济指标实时平衡完毕。',
-    content: `系统运行日志：\n- 物理渲染循环：已锁定 60 FPS。\n- 多国推演调度线程：健康度 100%。\n- 语言与译名映射表：zh-CN 汉语通名校验通过。\n- 欢迎在系统设置中调整专属底色与推演基准。`,
-    timestamp: '昨天 18:40',
-    isRead: true,
-    priority: 'normal',
-    actionType: 'none',
+    categoryLabel: '系统',
+    title: '世界议会',
+    senderName: '世界议会秘书处',
+    time: '9月5日',
+    summary: '关于「粉陆纪元 · 开天辟地」剧本的更新公告',
+    content: `【全域世界推演规则升级公告】\n\n世界议会已正式向全域通报第 24 次地缘演算修正：\n1. 同盟规模限制：最多 3 个国家加入同一同盟；\n2. 全球紧张度指数全面取代原旧有冲突计算；\n3. 开放无限省份领土自选建国，赋能领主缔造超大陆文明；\n4. 个人主页现已接入剧本编辑、同盟组建与国家数据整编中枢。\n\n愿世界和平，推演永续！`,
+    avatarType: 'un',
+  },
+  {
+    id: 'msg_lcj',
+    category: 'private',
+    categoryLabel: '私人',
+    title: '林初霁',
+    senderName: '参谋长 · 林初霁',
+    time: '9月4日',
+    summary: '下次会议的资料我已经整理好了，记得查看...',
+    content: `指挥官：\n\n下次前线演训会议的机要资料我已经全部整理装订就绪了！里面重点标注了西境防线的雷达预警死角以及 3 个装甲师团的补给耗油估算。\n\n有空时记得在终端里过目一下。如果需要调整进攻矛头向量，随时呼叫我哦～`,
+    avatarType: 'anime',
+  },
+  {
+    id: 'msg_xjg',
+    category: 'diplomacy',
+    categoryLabel: '外交',
+    title: '西境公国',
+    senderName: '西境防务司令部',
+    time: '9月3日',
+    summary: '关于共同防御条约的意见反馈',
+    content: `致战略参谋本部：\n\n西境公国大公府已详阅贵方提交的防务互保备忘录草案。我方防务总监对条约第 2 款之补给线支援持高度认可态度。\n\n建议在后续公约签署仪式上，补充关于航空兵过境走廊的联合雷达识别码细则。期待早日正式换约！`,
+    avatarType: 'fortress',
   },
 ];
+
+// 归档初始种子数据
+const INITIAL_ARCHIVED_MESSAGES: DispatchMessage[] = [
+  {
+    id: 'msg_archived_seed_1',
+    category: 'system',
+    categoryLabel: '系统',
+    title: '推演系统上一纪元归档记录',
+    senderName: '历史沙盘文献库',
+    time: '8月28日',
+    summary: '上一季度全域沙盘推演记录已归入史册，点击查阅历史总结。',
+    content: `沙盘推演归档凭证：\n\n上一纪元的 140 场战役与 36 项多边公约已成功生成历史编年史。\n\n领主随时可在【我的】主页中调取历史功勋章与地缘版图演进轨迹。`,
+    avatarType: 'un',
+    isArchived: true,
+  },
+];
+
+// 高保真 SVG 头像渲染器
+export const MessageAvatar: React.FC<{ type: DispatchMessage['avatarType']; isOnline?: boolean }> = ({
+  type,
+  isOnline,
+}) => {
+  return (
+    <div className="relative w-12 h-12 rounded-full shrink-0 select-none shadow-2xs">
+      {type === 'compass' && (
+        <svg viewBox="0 0 48 48" className="w-full h-full rounded-full">
+          <circle cx="24" cy="24" r="24" fill="#0b132b" />
+          <circle cx="24" cy="24" r="18" fill="none" stroke="#1c2541" strokeWidth="1.2" />
+          <circle cx="24" cy="24" r="12" fill="none" stroke="#3a506b" strokeWidth="0.8" />
+          {/* 四角罗盘星 */}
+          <path d="M24 5 L27 21 L43 24 L27 27 L24 43 L21 27 L5 24 L21 21 Z" fill="#ffffff" />
+          <path d="M24 5 L24 24 L27 21 Z" fill="#cbd5e1" />
+          <path d="M43 24 L24 24 L27 27 Z" fill="#94a3b8" />
+          <path d="M24 43 L24 24 L21 27 Z" fill="#64748b" />
+          <path d="M5 24 L24 24 L21 21 Z" fill="#94a3b8" />
+          <circle cx="24" cy="24" r="2.5" fill="#38bdf8" />
+        </svg>
+      )}
+
+      {type === 'eagle' && (
+        <svg viewBox="0 0 48 48" className="w-full h-full rounded-full">
+          <circle cx="24" cy="24" r="24" fill="#ffffff" />
+          <circle cx="24" cy="24" r="23" fill="none" stroke="#1d4ed8" strokeWidth="2" />
+          {/* 双头鹰金徽 */}
+          <path
+            d="M24 10 L22 13 L20 12 L20 15 L18 16 L17 19 L19 21 L16 23 L14 27 L17 28 L16 32 L20 35 L22 33 L24 36 L26 33 L28 35 L32 32 L31 28 L34 27 L32 23 L29 21 L31 19 L30 16 L28 15 L28 12 L26 13 Z"
+            fill="#d97706"
+          />
+          <path d="M24 17 L27 21 L27 27 L24 29 L21 27 L21 21 Z" fill="#b45309" />
+          <rect x="22.5" y="7.5" width="3" height="3" fill="#f59e0b" rx="0.5" />
+        </svg>
+      )}
+
+      {type === 'lion' && (
+        <svg viewBox="0 0 48 48" className="w-full h-full rounded-full">
+          <circle cx="24" cy="24" r="24" fill="#7f1d1d" />
+          {/* 金边盾牌 */}
+          <path
+            d="M12 12 C12 12 16 10 24 10 C32 10 36 12 36 12 L36 26 C36 34 24 38 24 38 C24 38 12 34 12 26 Z"
+            fill="#991b1b"
+            stroke="#fbbf24"
+            strokeWidth="1.2"
+          />
+          {/* 跃立雄狮金影 */}
+          <path
+            d="M23 15 C24 14 26 14 27 15 C27 16 26 17 27 18 C29 17 30 19 29 21 C28 22 26 21 25 22 C26 24 28 25 27 27 C26 29 23 27 23 28 C23 30 25 32 23 33 C21 34 20 32 19 30 C19 28 21 27 21 25 C20 25 19 26 18 25 C17 23 20 22 21 21 C20 19 21 16 23 15 Z"
+            fill="#fbbf24"
+          />
+        </svg>
+      )}
+
+      {type === 'palace' && (
+        <svg viewBox="0 0 48 48" className="w-full h-full rounded-full">
+          <defs>
+            <linearGradient id="msgPalaceBg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#bae6fd" />
+              <stop offset="100%" stopColor="#38bdf8" />
+            </linearGradient>
+          </defs>
+          <circle cx="24" cy="24" r="24" fill="url(#msgPalaceBg)" />
+          {/* 尖顶宫殿城堡 */}
+          <path d="M24 8 L26 16 L27 26 L21 26 L22 16 Z" fill="#0f172a" />
+          <path d="M16 14 L18 20 L19 28 L13 28 L14 20 Z" fill="#1e293b" />
+          <path d="M32 14 L34 20 L35 28 L29 28 L30 20 Z" fill="#1e293b" />
+          <rect x="12" y="27" width="24" height="13" rx="2" fill="#334155" />
+          <circle cx="24" cy="33" r="3" fill="#ffffff" />
+          <path d="M6 38 C12 36 36 36 42 38 L42 48 L6 48 Z" fill="#475569" />
+        </svg>
+      )}
+
+      {type === 'un' && (
+        <svg viewBox="0 0 48 48" className="w-full h-full rounded-full">
+          <circle cx="24" cy="24" r="24" fill="#1e293b" />
+          {/* 联合国式地球经纬与橄榄枝 */}
+          <circle cx="24" cy="24" r="9.5" fill="none" stroke="#f1f5f9" strokeWidth="1.2" />
+          <ellipse cx="24" cy="24" rx="4.8" ry="9.5" fill="none" stroke="#f1f5f9" strokeWidth="0.8" />
+          <line x1="14.5" y1="24" x2="33.5" y2="24" stroke="#f1f5f9" strokeWidth="0.8" />
+          <line x1="16.5" y1="19.5" x2="31.5" y2="19.5" stroke="#f1f5f9" strokeWidth="0.8" />
+          <line x1="16.5" y1="28.5" x2="31.5" y2="28.5" stroke="#f1f5f9" strokeWidth="0.8" />
+          {/* 橄榄枝叶 */}
+          <path
+            d="M10 27 C9 22 13 15 19 12 M9 23 C11 22 13 23 13 23 M10 19 C12 18 14 20 14 20 M12 15 C14 15 16 17 16 17"
+            fill="none"
+            stroke="#cbd5e1"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+          <path
+            d="M38 27 C39 22 35 15 29 12 M39 23 C37 22 35 23 35 23 M38 19 C36 18 34 20 34 20 M36 15 C34 15 32 17 32 17"
+            fill="none"
+            stroke="#cbd5e1"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+          />
+        </svg>
+      )}
+
+      {type === 'anime' && (
+        <svg viewBox="0 0 48 48" className="w-full h-full rounded-full">
+          <defs>
+            <linearGradient id="msgAnimeBg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#e0e7ff" />
+              <stop offset="100%" stopColor="#c7d2fe" />
+            </linearGradient>
+          </defs>
+          <circle cx="24" cy="24" r="24" fill="url(#msgAnimeBg)" />
+          {/* 军装领与白发少女 */}
+          <path d="M12 44 C12 36 16 33 24 33 C32 33 36 36 36 44 Z" fill="#1e293b" />
+          <path d="M20 33 L24 38 L28 33 Z" fill="#ffffff" />
+          <circle cx="24" cy="23" r="11" fill="#f8fafc" />
+          <path
+            d="M17 21 C17 27 21 30 24 30 C27 30 31 27 31 21 C31 16 27 15 24 15 C21 15 17 16 17 21 Z"
+            fill="#fed7aa"
+          />
+          <ellipse cx="21" cy="22" rx="1.5" ry="2" fill="#3b82f6" />
+          <ellipse cx="27" cy="22" rx="1.5" ry="2" fill="#3b82f6" />
+          <circle cx="21.5" cy="21.5" r="0.5" fill="#ffffff" />
+          <circle cx="27.5" cy="21.5" r="0.5" fill="#ffffff" />
+          <path d="M14 19 C15 13 20 10 24 10 C28 10 33 13 34 19 C31 17 28 19 25 18 C22 17 17 19 14 19 Z" fill="#ffffff" />
+          <path d="M16 18 L18 24 L19 18 Z" fill="#e2e8f0" />
+          <path d="M32 18 L30 24 L29 18 Z" fill="#e2e8f0" />
+        </svg>
+      )}
+
+      {type === 'fortress' && (
+        <svg viewBox="0 0 48 48" className="w-full h-full rounded-full">
+          <defs>
+            <linearGradient id="msgDuchyBg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#bae6fd" />
+              <stop offset="100%" stopColor="#60a5fa" />
+            </linearGradient>
+          </defs>
+          <circle cx="24" cy="24" r="24" fill="url(#msgDuchyBg)" />
+          {/* 高山堡垒石塔 */}
+          <polygon points="10,42 24,18 38,42" fill="#475569" />
+          <rect x="20" y="22" width="8" height="15" fill="#ffffff" />
+          <polygon points="18,22 24,14 30,22" fill="#1e293b" />
+          <polygon points="12,40 18,28 22,40" fill="#64748b" />
+          <polygon points="26,40 30,28 36,40" fill="#64748b" />
+        </svg>
+      )}
+
+      {/* 在线绿点 */}
+      {isOnline && (
+        <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white shadow-xs" />
+      )}
+    </div>
+  );
+};
 
 export const MessagesView: React.FC<MessagesViewProps> = ({
   user,
@@ -118,11 +315,10 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
   onOpenDiplomacy,
   showToast,
 }) => {
-  const { settings } = useAppSettings();
-
-  const [messages, setMessages] = useState<ExtendedMessage[]>(() => {
+  // 消息状态管理
+  const [messages, setMessages] = useState<DispatchMessage[]>(() => {
     try {
-      const saved = localStorage.getItem('app_messages_v1');
+      const saved = localStorage.getItem('fc_messages_store_v2');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -130,403 +326,503 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
     } catch {
       // fallback
     }
-    return PRESET_MESSAGES;
+    return INITIAL_MESSAGES;
   });
 
-  const [selectedCategory, setSelectedCategory] = useState<MessageCategory>('all');
+  const [archivedMessages, setArchivedMessages] = useState<DispatchMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem('fc_messages_archived_v2');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // fallback
+    }
+    return INITIAL_ARCHIVED_MESSAGES;
+  });
+
+  // 分类筛选与搜索
+  const [activeCategory, setActiveCategory] = useState<MessageCategory>('all');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
-  const [selectedMessage, setSelectedMessage] = useState<ExtendedMessage | null>(null);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+
+  // 弹窗状态
+  const [selectedMessage, setSelectedMessage] = useState<DispatchMessage | null>(null);
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
   const [isComposeModalOpen, setIsComposeModalOpen] = useState(false);
 
-  // New message form state
-  const [composeTargetNation, setComposeTargetNation] = useState('');
+  // 撰写公牒表单
   const [composeCategory, setComposeCategory] = useState<MessageCategory>('diplomacy');
+  const [composeRecipient, setComposeRecipient] = useState('');
   const [composeTitle, setComposeTitle] = useState('');
   const [composeContent, setComposeContent] = useState('');
-  const [isSending, setIsSending] = useState(false);
 
-  // Save messages to localStorage
+  // 同步本地存储
   useEffect(() => {
     try {
-      localStorage.setItem('app_messages_v1', JSON.stringify(messages));
+      localStorage.setItem('fc_messages_store_v2', JSON.stringify(messages));
     } catch {
       // ignore
     }
   }, [messages]);
 
-  // Fetch real notifications from api and integrate
   useEffect(() => {
-    let active = true;
-    api.notifications
-      .list()
-      .then((res) => {
-        if (!active || !res?.notifications) return;
-        if (res.notifications.length === 0) return;
+    try {
+      localStorage.setItem('fc_messages_archived_v2', JSON.stringify(archivedMessages));
+    } catch {
+      // ignore
+    }
+  }, [archivedMessages]);
 
-        const converted: ExtendedMessage[] = res.notifications.map((n) => {
-          let cat: MessageCategory = 'system';
-          if (n.type === 'dip_request' || n.type === 'dip_result') cat = 'diplomacy';
-          else if (n.type === 'war_alert') cat = 'war';
+  // 计算全部未读数（完全还原参考图“全部 5”）
+  const totalUnreadCount = useMemo(() => {
+    return messages.reduce((acc, m) => {
+      if (m.unreadCount) return acc + m.unreadCount;
+      if (m.hasRedDot) return acc + 1;
+      return acc;
+    }, 0);
+  }, [messages]);
 
-          return {
-            id: n.id,
-            category: cat,
-            title: n.title,
-            senderName: n.relatedNationName || '地缘信息通告署',
-            senderTag: cat === 'diplomacy' ? '外交照会' : cat === 'war' ? '战事预警' : '官方信函',
-            summary: n.content.slice(0, 60) + (n.content.length > 60 ? '...' : ''),
-            content: n.content,
-            timestamp: new Date(n.createdAt).toLocaleDateString(),
-            isRead: n.isRead,
-            relatedNationId: n.relatedNationId,
-            actionType: cat === 'diplomacy' ? 'view_diplomacy' : cat === 'war' ? 'view_war' : 'none',
-          };
-        });
-
-        setMessages((prev) => {
-          const ids = new Set(prev.map((m) => m.id));
-          const newItems = converted.filter((c) => !ids.has(c.id));
-          return [...newItems, ...prev];
-        });
-      })
-      .catch(() => {});
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  // Filtered list
+  // 筛选消息
   const filteredMessages = useMemo(() => {
     return messages.filter((msg) => {
-      if (selectedCategory !== 'all' && msg.category !== selectedCategory) return false;
+      if (activeCategory !== 'all') {
+        if (msg.category !== activeCategory) return false;
+      }
       if (searchKeyword.trim()) {
         const q = searchKeyword.toLowerCase();
         return (
           msg.title.toLowerCase().includes(q) ||
           msg.senderName.toLowerCase().includes(q) ||
-          msg.summary.toLowerCase().includes(q)
+          msg.summary.toLowerCase().includes(q) ||
+          msg.content.toLowerCase().includes(q)
         );
       }
       return true;
     });
-  }, [messages, selectedCategory, searchKeyword]);
+  }, [messages, activeCategory, searchKeyword]);
 
-  const unreadTotal = useMemo(() => messages.filter((m) => !m.isRead).length, [messages]);
-
-  // Actions
-  const handleMarkAsRead = (id: string, e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    setMessages((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, isRead: true } : m))
-    );
-    api.notifications.markAsRead(id).catch(() => {});
+  // 操作：标记为已读
+  const handleOpenMessage = (msg: DispatchMessage) => {
+    if (msg.unreadCount || msg.hasRedDot) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === msg.id ? { ...m, unreadCount: undefined, hasRedDot: false } : m
+        )
+      );
+    }
+    setSelectedMessage(msg);
   };
 
+  // 操作：全部已读
   const handleMarkAllAsRead = () => {
-    setMessages((prev) => prev.map((m) => ({ ...m, isRead: true })));
-    api.notifications.markAllAsRead().catch(() => {});
+    setMessages((prev) =>
+      prev.map((m) => ({ ...m, unreadCount: undefined, hasRedDot: false }))
+    );
+    setMoreMenuOpen(false);
     showToast('全部消息已标为已读');
   };
 
-  const handleDeleteMessage = (id: string, e?: React.MouseEvent) => {
+  // 操作：归档单个消息
+  const handleArchiveMessage = (msg: DispatchMessage, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    setMessages((prev) => prev.filter((m) => m.id !== id));
-    if (selectedMessage?.id === id) setSelectedMessage(null);
-    api.notifications.delete(id).catch(() => {});
-    showToast('消息已删除');
+    setMessages((prev) => prev.filter((m) => m.id !== msg.id));
+    setArchivedMessages((prev) => [{ ...msg, isArchived: true }, ...prev]);
+    if (selectedMessage?.id === msg.id) setSelectedMessage(null);
+    showToast(`已归档【${msg.title}】`);
   };
 
-  const handleClearRead = () => {
-    setMessages((prev) => prev.filter((m) => !m.isRead));
-    showToast('已清理全部已读消息');
+  // 操作：从归档恢复消息
+  const handleRestoreMessage = (msg: DispatchMessage) => {
+    setArchivedMessages((prev) => prev.filter((m) => m.id !== msg.id));
+    setMessages((prev) => [{ ...msg, isArchived: false }, ...prev]);
+    showToast(`已将【${msg.title}】恢复至消息列表`);
   };
 
+  // 操作：接受同盟公约邀请
+  const handleAcceptAlliance = (msg: DispatchMessage) => {
+    try {
+      const existing = strategicStorage.getAlliances();
+      const newAlliance: AllianceFaction = {
+        id: `alliance_nfwg_${Date.now()}`,
+        name: '南风-华夏多边同盟公约',
+        tag: 'SOUTH-PACT',
+        leaderNationId: 'nation_nfwg',
+        leaderNationName: '南风王国',
+        memberNationIds: ['nation_nfwg', myNation?.id || 'nation_my'],
+        memberNationNames: ['南风王国', myNation?.name || '华夏执政国'],
+        description: '南风王国与盟友共同建立的多边安全互助公约，遵循最多 3 国公约上限',
+        mutualDefense: true,
+        bannerColor: '#991b1b',
+        createdAt: new Date().toISOString(),
+        chatMessages: [],
+      };
+      strategicStorage.saveAlliances([newAlliance, ...existing]);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === msg.id ? { ...m, actionTaken: 'accepted' } : m))
+      );
+      if (selectedMessage) {
+        setSelectedMessage((prev) => (prev ? { ...prev, actionTaken: 'accepted' } : null));
+      }
+      showToast('🎉 已正式签署公约，成功与南风王国结为同盟！');
+    } catch {
+      showToast('同盟公约签署失败，请重试');
+    }
+  };
+
+  // 发送自定义牒文
   const handleSendCompose = (e: React.FormEvent) => {
     e.preventDefault();
     if (!composeTitle.trim() || !composeContent.trim()) {
-      showToast('请填写完整的标题与正文内容');
+      showToast('请填写完整的牒文标题与正文');
       return;
     }
 
-    setIsSending(true);
-    setTimeout(() => {
-      const newMsg: ExtendedMessage = {
-        id: `msg-user-${Date.now()}`,
-        category: composeCategory,
-        title: composeTitle.trim(),
-        senderName: myNation?.name || user?.username || '我方中枢指挥部',
-        senderTag: '已发出公牒',
-        summary: composeContent.trim().slice(0, 60) + '...',
-        content: composeContent.trim(),
-        timestamp: '刚刚',
-        isRead: true,
-        priority: 'normal',
-      };
+    const catLabelMap: Record<MessageCategory, '私人' | '外交' | '系统' | '国家事务'> = {
+      all: '外交',
+      private: '私人',
+      diplomacy: '外交',
+      system: '系统',
+      national_affairs: '国家事务',
+    };
 
-      setMessages((prev) => [newMsg, ...prev]);
-      setIsSending(false);
-      setIsComposeModalOpen(false);
-      setComposeTitle('');
-      setComposeContent('');
-      setComposeTargetNation('');
-      showToast('通报公文已加密发出');
-    }, 400);
+    const newMsg: DispatchMessage = {
+      id: `msg_user_${Date.now()}`,
+      category: composeCategory,
+      categoryLabel: catLabelMap[composeCategory],
+      title: composeRecipient.trim() || '全域通报牒文',
+      senderName: myNation?.name || user?.username || '我方中枢指挥部',
+      time: '刚刚',
+      summary: composeTitle.trim(),
+      content: composeContent.trim(),
+      avatarType: 'compass',
+      isOnline: true,
+    };
+
+    setMessages((prev) => [newMsg, ...prev]);
+    setIsComposeModalOpen(false);
+    setComposeTitle('');
+    setComposeContent('');
+    setComposeRecipient('');
+    showToast('公牒已正式加密下达');
   };
 
-  // Category Pills config
-  const CATEGORIES: { id: MessageCategory; label: string; count: number }[] = [
-    { id: 'all', label: '全部', count: messages.length },
-    {
-      id: 'diplomacy',
-      label: '外交照会',
-      count: messages.filter((m) => m.category === 'diplomacy').length,
-    },
-    {
-      id: 'war',
-      label: '战事警报',
-      count: messages.filter((m) => m.category === 'war').length,
-    },
-    {
-      id: 'community',
-      label: '创作者互动',
-      count: messages.filter((m) => m.category === 'community').length,
-    },
-    {
-      id: 'system',
-      label: '系统推演',
-      count: messages.filter((m) => m.category === 'system').length,
-    },
+  // 渲染分类标签配置（与参考图完全一致：全部 5、私人、外交、系统、国家事务）
+  const FILTER_PILLS: Array<{
+    id: MessageCategory;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    count?: number;
+  }> = [
+    { id: 'all', label: '全部', icon: Mail, count: totalUnreadCount },
+    { id: 'private', label: '私人', icon: UserIcon },
+    { id: 'diplomacy', label: '外交', icon: Handshake },
+    { id: 'system', label: '系统', icon: Bell },
+    { id: 'national_affairs', label: '国家事务', icon: FileText },
   ];
 
   return (
-    <div className="flex-1 flex flex-col w-full max-w-4xl mx-auto px-3 sm:px-6 py-2 sm:py-4 animate-fadeIn pb-24">
-      {/* 1. Header Bar (Avant-garde layout) */}
-      <div className="flex items-center justify-between pb-3 sm:pb-4 mb-3 border-b border-slate-200/80 gap-3">
-        <div className="flex items-center gap-2.5">
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-2xs shrink-0"
-            style={{ backgroundColor: settings.themeAccent }}
-          >
-            <MessageSquare className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                消息中心
-              </h1>
-              <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200/60">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>实时通联</span>
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 mt-0.5 hidden sm:block font-medium">
-              粉陆照会 · 战术警报 · 创作者信函
-            </p>
-          </div>
-        </div>
-
-        {/* Action Controls */}
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => setIsComposeModalOpen(true)}
-            className="px-3 py-1.5 rounded-xl text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer transition-all hover:opacity-90 active:scale-95"
-            style={{ backgroundColor: settings.themeAccent }}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">撰写牒文</span>
-            <span className="sm:hidden">发信</span>
-          </button>
-
-          {unreadTotal > 0 && (
-            <button
-              type="button"
-              onClick={handleMarkAllAsRead}
-              className="px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-medium transition cursor-pointer flex items-center gap-1 shadow-2xs"
-              title="全部标为已读"
-            >
-              <CheckCheck className="w-3.5 h-3.5 text-indigo-600" />
-              <span className="hidden md:inline">全部已读</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={handleClearRead}
-            className="p-1.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-400 hover:text-rose-600 transition cursor-pointer shadow-2xs"
-            title="清空所有已读消息"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Filter Tabs & Search Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-4">
-        {/* Category Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-                selectedCategory === cat.id
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'bg-white hover:bg-slate-50 text-slate-600 border border-slate-200/80 hover:border-slate-300'
-              }`}
-            >
-              <span>{cat.label}</span>
-              {cat.count > 0 && (
-                <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                    selectedCategory === cat.id
-                      ? 'bg-slate-800 text-slate-300'
-                      : 'bg-slate-100 text-slate-500'
-                  }`}
-                >
-                  {cat.count}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Search Input */}
-        <div className="relative min-w-[200px]">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchKeyword}
-            onChange={(e) => setSearchKeyword(e.target.value)}
-            placeholder="搜索消息、粉陆、发件人..."
-            className="w-full pl-8 pr-7 py-1.5 text-xs text-slate-800 placeholder-slate-400 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 shadow-2xs"
+    <div className="flex-1 w-full bg-[#f8fafc] text-slate-800 min-h-screen pb-24 select-none relative overflow-x-hidden">
+      {/* 顶部右侧世界地图浅色水印（精准还原图顶淡雅地形图纹理） */}
+      <div
+        aria-hidden="true"
+        className="absolute top-0 right-0 w-80 h-52 pointer-events-none opacity-20 overflow-hidden"
+      >
+        <svg viewBox="0 0 400 240" className="w-full h-full text-slate-500 fill-current">
+          <path
+            d="M 60 30 Q 100 20 140 38 T 210 35 Q 260 25 300 45 T 370 40 Q 390 65 360 85 T 300 105 Q 260 135 220 125 T 160 115 Q 120 105 80 70 Z"
+            opacity="0.45"
           />
-          {searchKeyword && (
-            <button
-              type="button"
-              onClick={() => setSearchKeyword('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          )}
-        </div>
+          <path
+            d="M 220 50 Q 270 42 320 65 T 370 95 Q 350 135 310 145 T 250 125 Q 220 95 220 50 Z"
+            opacity="0.35"
+          />
+          <path
+            d="M 110 110 Q 140 120 150 160 T 120 200 Q 90 190 100 140 Z"
+            opacity="0.4"
+          />
+          <path
+            d="M 260 130 Q 310 140 320 180 T 280 210 Q 250 190 260 130 Z"
+            opacity="0.3"
+          />
+        </svg>
       </div>
 
-      {/* 3. Messages List */}
-      <div className="space-y-2.5">
-        {filteredMessages.length === 0 ? (
-          <div className="p-12 text-center bg-white border border-slate-200/80 rounded-2xl shadow-2xs">
-            <div className="w-12 h-12 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center mx-auto mb-3 text-slate-400">
-              <MessageSquare className="w-6 h-6" />
+      <div className="max-w-md mx-auto px-4 pt-3 sm:pt-4">
+        {/* 1. 顶部品牌栏与操作入口：FC · FANS CONQUEST + 搜索与更多按钮 */}
+        <header className="flex items-start justify-between relative z-10 pt-1 pb-3">
+          <div>
+            <div className="text-xl font-extrabold tracking-tight text-slate-900 leading-none">
+              FC
             </div>
-            <h3 className="text-sm font-bold text-slate-800">暂无相关消息</h3>
-            <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-              当前分类下暂无通讯公文或通知。您可以通过上方“撰写牒文”向其他粉陆或创作者主动发起通报。
-            </p>
+            <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase mt-0.5">
+              FANS CONQUEST
+            </div>
+            <div className="text-[11px] text-slate-400 mt-0.5">
+              连接世界 · 书写属于你的时代
+            </div>
           </div>
-        ) : (
-          filteredMessages.map((msg) => {
-            const isDiplomacy = msg.category === 'diplomacy';
-            const isWar = msg.category === 'war';
-            const isCommunity = msg.category === 'community';
 
-            return (
-              <div
-                key={msg.id}
-                onClick={() => {
-                  handleMarkAsRead(msg.id);
-                  setSelectedMessage(msg);
-                }}
-                className={`relative p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer group select-none ${
-                  !msg.isRead
-                    ? 'bg-white border-indigo-200/90 shadow-xs hover:border-indigo-300'
-                    : 'bg-white hover:bg-slate-50/80 border-slate-200/80 hover:border-slate-300'
-                }`}
+          {/* 右侧搜索与更多图标按钮 */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSearchOpen(!searchOpen)}
+              className="w-8 h-8 rounded-full bg-slate-100/90 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition cursor-pointer active:scale-95 shadow-2xs"
+              title="搜索消息"
+            >
+              <Search className="w-4 h-4 stroke-[2.2]" />
+            </button>
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMoreMenuOpen(!moreMenuOpen)}
+                className="w-8 h-8 rounded-full bg-slate-100/90 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition cursor-pointer active:scale-95 shadow-2xs"
+                title="更多操作"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3 min-w-0">
-                    {/* Category Icon */}
-                    <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-2xs ${
-                        isDiplomacy
-                          ? 'bg-indigo-50 text-indigo-600 border border-indigo-100'
-                          : isWar
-                          ? 'bg-rose-50 text-rose-600 border border-rose-100'
-                          : isCommunity
-                          ? 'bg-purple-50 text-purple-600 border border-purple-100'
-                          : 'bg-slate-50 text-slate-600 border border-slate-200'
-                      }`}
-                    >
-                      {isDiplomacy ? (
-                        <Globe2 className="w-4 h-4" />
-                      ) : isWar ? (
-                        <Swords className="w-4 h-4" />
-                      ) : isCommunity ? (
-                        <Sparkles className="w-4 h-4" />
-                      ) : (
-                        <Radio className="w-4 h-4" />
-                      )}
-                    </div>
+                <MoreHorizontal className="w-4 h-4 stroke-[2.2]" />
+              </button>
 
-                    {/* Content preview */}
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {/* Unread indicator */}
-                        {!msg.isRead && (
-                          <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0 ring-2 ring-rose-100 animate-pulse" />
-                        )}
-
-                        <span className="font-bold text-sm text-slate-900 tracking-tight group-hover:text-indigo-600 transition-colors truncate">
-                          {msg.title}
-                        </span>
-
-                        {msg.senderTag && (
-                          <span className="text-[10px] px-1.5 py-0.2 rounded font-mono font-semibold bg-slate-100 text-slate-600 border border-slate-200/60 shrink-0">
-                            {msg.senderTag}
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed font-normal">
-                        {msg.summary}
-                      </p>
-
-                      {/* Meta footer */}
-                      <div className="flex items-center gap-3 mt-2 text-[11px] text-slate-400 font-medium">
-                        <span className="text-slate-600 font-semibold">{msg.senderName}</span>
-                        <span>·</span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-slate-400" />
-                          <span>{msg.timestamp}</span>
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions right */}
-                  <div className="flex items-center gap-1 shrink-0">
+              {/* 更多菜单浮层 */}
+              <AnimatePresence>
+                {moreMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                    className="absolute right-0 mt-1.5 w-44 rounded-2xl bg-white border border-slate-200/90 shadow-xl py-1.5 z-30 text-xs font-medium"
+                  >
                     <button
                       type="button"
-                      onClick={(e) => handleDeleteMessage(msg.id, e)}
-                      className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-rose-600 transition cursor-pointer rounded-lg hover:bg-rose-50"
-                      title="删除消息"
+                      onClick={handleMarkAllAsRead}
+                      className="w-full px-3.5 py-2 text-left hover:bg-slate-50 flex items-center gap-2 text-slate-700 cursor-pointer"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <CheckCheck className="w-3.5 h-3.5 text-blue-600" />
+                      <span>全部标为已读</span>
                     </button>
 
-                    <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-600 group-hover:translate-x-0.5 transition-all" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMoreMenuOpen(false);
+                        setIsComposeModalOpen(true);
+                      }}
+                      className="w-full px-3.5 py-2 text-left hover:bg-slate-50 flex items-center gap-2 text-slate-700 cursor-pointer"
+                    >
+                      <Send className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>起草通报牒文</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMoreMenuOpen(false);
+                        setIsArchiveModalOpen(true);
+                      }}
+                      className="w-full px-3.5 py-2 text-left hover:bg-slate-50 flex items-center gap-2 text-slate-700 cursor-pointer"
+                    >
+                      <Archive className="w-3.5 h-3.5 text-slate-500" />
+                      <span>打开归档信箱</span>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </header>
+
+        {/* 展开的搜索输入栏 */}
+        <AnimatePresence>
+          {searchOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden pb-3"
+            >
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchKeyword}
+                  onChange={(e) => setSearchKeyword(e.target.value)}
+                  placeholder="搜索消息、国家、外交公文..."
+                  autoFocus
+                  className="w-full pl-9 pr-8 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800 placeholder-slate-400"
+                />
+                {searchKeyword && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchKeyword('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 2. 主标题与诗意寄语行（消息 · 来自世界的回响 + 历史长河名言） */}
+        <div className="flex items-start justify-between pt-1 pb-4 gap-3 relative z-10">
+          <div>
+            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
+              消息
+            </h1>
+            <p className="text-sm text-slate-400 mt-0.5">来自世界的回响</p>
+          </div>
+
+          {/* 右侧诗性长言：“在历史的长河中 每一次交流，都可能改变世界。” */}
+          <div className="text-right max-w-[170px] pt-1">
+            <p className="text-[11px] text-slate-400 leading-relaxed font-normal tracking-wide">
+              “ 在历史的长河中
+              <br />
+              每一次交流，
+              <br />
+              都可能改变世界。”
+            </p>
+          </div>
+        </div>
+
+        {/* 3. 分类胶囊按钮栏（全部 5 · 私人 · 外交 · 系统 · 国家事务） */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 pb-3 relative z-10">
+          {FILTER_PILLS.map((pill) => {
+            const Icon = pill.icon;
+            const isActive = activeCategory === pill.id;
+
+            return (
+              <button
+                key={pill.id}
+                type="button"
+                onClick={() => setActiveCategory(pill.id as MessageCategory)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer select-none active:scale-95 ${
+                  isActive
+                    ? 'bg-[#3B82F6] text-white shadow-xs'
+                    : 'bg-white text-slate-700 border border-slate-200/80 hover:bg-slate-50'
+                }`}
+              >
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-slate-600'}`} />
+                <span>{pill.label}</span>
+                {pill.count !== undefined && pill.count > 0 && (
+                  <span
+                    className={`ml-0.5 text-[11px] font-bold px-1.5 py-0.2 rounded-full ${
+                      isActive ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {pill.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 4. 消息列表 */}
+        <div className="space-y-2.5 pt-1">
+          {filteredMessages.length === 0 ? (
+            <div className="py-12 text-center bg-white rounded-2xl border border-slate-100 p-6 shadow-2xs">
+              <Mail className="w-10 h-10 text-slate-300 mx-auto mb-2 stroke-[1.5]" />
+              <div className="text-xs font-bold text-slate-700">当前分类暂无相关消息</div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                点击右上角“更多”起草新牒文，向全域或特定国家发送信函
+              </p>
+            </div>
+          ) : (
+            filteredMessages.map((msg) => {
+              return (
+                <div
+                  key={msg.id}
+                  onClick={() => handleOpenMessage(msg)}
+                  className="p-3.5 rounded-2xl bg-white border border-slate-100/90 hover:border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-all cursor-pointer flex items-center justify-between gap-3 active:scale-[0.99]"
+                >
+                  {/* 左侧：头像 */}
+                  <MessageAvatar type={msg.avatarType} isOnline={msg.isOnline} />
+
+                  {/* 中间：标题与内容预览 */}
+                  <div className="flex-1 min-w-0 pr-1">
+                    <div className="text-sm font-bold text-slate-900 truncate">
+                      {msg.title}
+                    </div>
+
+                    <div className="flex items-center gap-1.5 mt-1 text-xs truncate">
+                      {/* 分类标签 */}
+                      <span
+                        className={`text-[11px] font-medium px-2 py-0.2 rounded-full shrink-0 ${
+                          msg.category === 'diplomacy'
+                            ? 'bg-[#EEF4FF] text-[#3B82F6]'
+                            : msg.category === 'private'
+                            ? 'bg-slate-100 text-slate-600'
+                            : msg.category === 'national_affairs'
+                            ? 'bg-[#E8F4FD] text-[#0284C7]'
+                            : 'bg-[#FEF3E8] text-[#EA580C]'
+                        }`}
+                      >
+                        {msg.categoryLabel}
+                      </span>
+
+                      {/* 内容文案 */}
+                      <span className="text-slate-500 truncate">
+                        {msg.isAllianceInvite ? (
+                          <>
+                            已向你发送{' '}
+                            <span className="text-[#3B82F6] font-medium">同盟邀请</span>
+                          </>
+                        ) : (
+                          msg.summary
+                        )}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 右侧：时间与未读红点/角标 */}
+                  <div className="flex flex-col items-end justify-between h-11 shrink-0">
+                    <span className="text-[11px] text-slate-400 font-normal">
+                      {msg.time}
+                    </span>
+
+                    <div className="h-5 flex items-center justify-end">
+                      {msg.unreadCount !== undefined && msg.unreadCount > 0 ? (
+                        <span className="w-5 h-5 rounded-full bg-[#3B82F6] text-white text-xs font-bold flex items-center justify-center font-sans shadow-2xs">
+                          {msg.unreadCount}
+                        </span>
+                      ) : msg.hasRedDot ? (
+                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-2xs" />
+                      ) : null}
+                    </div>
                   </div>
                 </div>
+              );
+            })
+          )}
+
+          {/* 5. 底部入口：已归档的消息（完全还原参考图底部入口） */}
+          <div
+            onClick={() => setIsArchiveModalOpen(true)}
+            className="p-3.5 rounded-2xl bg-white border border-slate-100/90 hover:border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-all cursor-pointer flex items-center justify-between gap-3 active:scale-[0.99] mt-3"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-11 h-11 rounded-2xl bg-slate-100/90 text-slate-500 flex items-center justify-center shrink-0">
+                <Archive className="w-5 h-5 stroke-[1.8]" />
               </div>
-            );
-          })
-        )}
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-slate-900">已归档的消息</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">查看已归档的历史消息</div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 text-slate-400">
+              <span className="text-xs font-mono">{archivedMessages.length}</span>
+              <ChevronRight className="w-4 h-4 stroke-[2]" />
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* 4. Message Detail Reader Modal */}
+      {/* 弹窗 1：消息详阅与回复/结盟处置弹窗 */}
       <AnimatePresence>
         {selectedMessage && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
@@ -539,19 +835,29 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
             />
 
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden z-10 max-h-[85vh] flex flex-col"
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-10 max-h-[88vh] flex flex-col"
             >
-              {/* Modal Top Header */}
-              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3 bg-slate-50/50">
+              {/* 弹窗头部 */}
+              <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase bg-indigo-50 text-indigo-700 border border-indigo-200/60">
-                    {selectedMessage.category} // DISPATCH
+                  <span
+                    className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                      selectedMessage.category === 'diplomacy'
+                        ? 'bg-[#EEF4FF] text-[#3B82F6]'
+                        : selectedMessage.category === 'private'
+                        ? 'bg-slate-100 text-slate-600'
+                        : selectedMessage.category === 'national_affairs'
+                        ? 'bg-[#E8F4FD] text-[#0284C7]'
+                        : 'bg-[#FEF3E8] text-[#EA580C]'
+                    }`}
+                  >
+                    {selectedMessage.categoryLabel}
                   </span>
                   <span className="text-xs text-slate-400 font-mono">
-                    {selectedMessage.timestamp}
+                    {selectedMessage.time}
                   </span>
                 </div>
 
@@ -564,90 +870,101 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                 </button>
               </div>
 
-              {/* Modal Content */}
+              {/* 弹窗主体 */}
               <div className="p-5 sm:p-6 overflow-y-auto space-y-4">
-                <div>
-                  <h2 className="text-base sm:text-lg font-bold text-slate-900 leading-snug">
-                    {selectedMessage.title}
-                  </h2>
-                  <div className="flex items-center gap-2 mt-2 text-xs text-slate-500 font-medium">
-                    <span>发自：</span>
-                    <span className="text-slate-800 font-bold">{selectedMessage.senderName}</span>
-                    {selectedMessage.senderTag && (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-mono">
-                        {selectedMessage.senderTag}
-                      </span>
-                    )}
+                <div className="flex items-center gap-3">
+                  <MessageAvatar
+                    type={selectedMessage.avatarType}
+                    isOnline={selectedMessage.isOnline}
+                  />
+                  <div>
+                    <h2 className="text-base font-extrabold text-slate-900 leading-tight">
+                      {selectedMessage.title}
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      发件方：{selectedMessage.senderName}
+                    </p>
                   </div>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-100 text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-line font-mono">
+                {/* 正文卡片 */}
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-line font-sans">
                   {selectedMessage.content}
                 </div>
+
+                {/* 针对“南风王国 同盟邀请”特别呈现同盟公约专属操作卡 */}
+                {selectedMessage.isAllianceInvite && (
+                  <div className="p-4 rounded-2xl bg-sky-50/70 border border-sky-200/80 space-y-2.5">
+                    <div className="flex items-center gap-2 text-xs font-bold text-sky-900">
+                      <Shield className="w-4 h-4 text-sky-600" />
+                      <span>同盟条约签署议案（最多 3 国同一同盟）</span>
+                    </div>
+                    <p className="text-[11px] text-sky-700 leading-relaxed">
+                      同意接纳后，将立即在推演中枢与南风王国结成集体防卫多边同盟，可在【我的】主页中随时查阅盟约与退盟。
+                    </p>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      {selectedMessage.actionTaken === 'accepted' ? (
+                        <div className="w-full py-2 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1">
+                          <Check className="w-4 h-4" />
+                          <span>已正式签署同盟条约</span>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleAcceptAlliance(selectedMessage)}
+                            className="flex-1 py-2 px-3 rounded-xl bg-[#3B82F6] hover:bg-blue-600 text-white text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer shadow-xs active:scale-95"
+                          >
+                            <Handshake className="w-3.5 h-3.5" />
+                            <span>接受同盟邀请</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedMessage((prev) =>
+                                prev ? { ...prev, actionTaken: 'declined' } : null
+                              );
+                              showToast('已委婉谢绝同盟邀请');
+                            }}
+                            className="py-2 px-3 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition cursor-pointer"
+                          >
+                            委婉谢绝
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Modal Action Footer */}
-              <div className="px-5 py-3.5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between gap-3">
+              {/* 弹窗底部操作条 */}
+              <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between gap-2">
                 <button
                   type="button"
-                  onClick={() => handleDeleteMessage(selectedMessage.id)}
-                  className="px-3 py-2 text-xs text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer font-medium flex items-center gap-1"
+                  onClick={() => handleArchiveMessage(selectedMessage)}
+                  className="text-xs text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-1.5 cursor-pointer py-1.5 px-2 rounded-lg hover:bg-slate-200/60 transition"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>删除此公文</span>
+                  <Archive className="w-3.5 h-3.5" />
+                  <span>归档此消息</span>
                 </button>
 
                 <div className="flex items-center gap-2">
-                  {selectedMessage.category === 'diplomacy' && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedMessage(null);
-                        onNavigateTab('lobby');
-                        showToast('已跳转至粉陆地缘大厅');
-                      }}
-                      className="px-3.5 py-2 rounded-xl text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
-                      style={{ backgroundColor: settings.themeAccent }}
-                    >
-                      <Globe2 className="w-3.5 h-3.5" />
-                      <span>查看粉陆</span>
-                    </button>
-                  )}
-
-                  {selectedMessage.category === 'war' && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedMessage(null);
-                        onNavigateTab('wars');
-                        showToast('已进入战区指挥部');
-                      }}
-                      className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Swords className="w-3.5 h-3.5" />
-                      <span>战区作战厅</span>
-                    </button>
-                  )}
-
-                  {selectedMessage.category === 'community' && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        showToast(`已向 ${selectedMessage.senderName} 发送回关信件`);
-                        setSelectedMessage(null);
-                      }}
-                      className="px-3.5 py-2 rounded-xl text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
-                      style={{ backgroundColor: settings.themeAccent }}
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>接受并回关</span>
-                    </button>
-                  )}
-
+                  <button
+                    type="button"
+                    onClick={() => {
+                      showToast('已调取外交文书通道');
+                      setSelectedMessage(null);
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-[#3B82F6] text-white text-xs font-bold hover:bg-blue-600 transition cursor-pointer shadow-xs active:scale-95"
+                  >
+                    回复牒文
+                  </button>
                   <button
                     type="button"
                     onClick={() => setSelectedMessage(null)}
-                    className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold transition cursor-pointer"
+                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold transition cursor-pointer"
                   >
                     关闭
                   </button>
@@ -658,7 +975,103 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
         )}
       </AnimatePresence>
 
-      {/* 5. Compose Dispatch Modal */}
+      {/* 弹窗 2：已归档消息列表抽屉/弹窗 */}
+      <AnimatePresence>
+        {isArchiveModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsArchiveModalOpen(false)}
+              className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs"
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-10 max-h-[85vh] flex flex-col"
+            >
+              <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-2">
+                  <Archive className="w-4 h-4 text-slate-600" />
+                  <h3 className="text-sm font-bold text-slate-900">
+                    已归档的历史消息 ({archivedMessages.length})
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsArchiveModalOpen(false)}
+                  className="w-8 h-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-4 sm:p-5 overflow-y-auto space-y-2.5">
+                {archivedMessages.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 text-xs">
+                    暂无归档历史消息
+                  </div>
+                ) : (
+                  archivedMessages.map((item) => (
+                    <div
+                      key={item.id}
+                      className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <MessageAvatar type={item.avatarType} />
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-slate-900 truncate">
+                            {item.title}
+                          </div>
+                          <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                            {item.summary}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleRestoreMessage(item)}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-semibold shrink-0 cursor-pointer flex items-center gap-1"
+                        title="恢复至主列表"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>恢复</span>
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setArchivedMessages([]);
+                    showToast('已清空归档信箱');
+                  }}
+                  className="text-xs text-rose-600 hover:text-rose-800 font-semibold cursor-pointer"
+                >
+                  清空归档信箱
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsArchiveModalOpen(false)}
+                  className="px-4 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold transition cursor-pointer"
+                >
+                  关闭
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 弹窗 3：起草通牒 / 发送公文 */}
       <AnimatePresence>
         {isComposeModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
@@ -671,49 +1084,45 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
             />
 
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden z-10 max-h-[90vh] flex flex-col"
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-10 max-h-[88vh] flex flex-col"
             >
-              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3 bg-slate-50/50">
+              <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                 <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-indigo-600" />
-                  <h2 className="text-sm sm:text-base font-bold text-slate-900">
-                    起草通报牒文 / 发送消息
-                  </h2>
+                  <Send className="w-4 h-4 text-blue-600" />
+                  <h3 className="text-sm font-bold text-slate-900">起草地缘牒文</h3>
                 </div>
-
                 <button
                   type="button"
                   onClick={() => setIsComposeModalOpen(false)}
-                  className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                  className="w-8 h-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 transition cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <form onSubmit={handleSendCompose} className="p-5 overflow-y-auto space-y-4">
-                {/* Category select */}
+              <form onSubmit={handleSendCompose} className="p-5 overflow-y-auto space-y-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
                     公牒分类
                   </label>
                   <div className="grid grid-cols-4 gap-1.5">
                     {[
-                      { id: 'diplomacy', label: '外交牒文' },
-                      { id: 'war', label: '战时通报' },
-                      { id: 'community', label: '创作者函' },
-                      { id: 'system', label: '推演记录' },
+                      { id: 'diplomacy', label: '外交' },
+                      { id: 'private', label: '私人' },
+                      { id: 'national_affairs', label: '国家事务' },
+                      { id: 'system', label: '系统' },
                     ].map((c) => (
                       <button
                         key={c.id}
                         type="button"
                         onClick={() => setComposeCategory(c.id as MessageCategory)}
-                        className={`py-2 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
+                        className={`py-1.5 text-xs font-semibold rounded-xl border transition cursor-pointer ${
                           composeCategory === c.id
-                            ? 'bg-indigo-50 border-indigo-300 text-indigo-700 shadow-2xs'
-                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                            ? 'bg-blue-50 border-blue-400 text-blue-700 shadow-2xs'
+                            : 'bg-white border-slate-200 text-slate-600'
                         }`}
                       >
                         {c.label}
@@ -722,64 +1131,60 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                   </div>
                 </div>
 
-                {/* Target nation or recipient */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    目标粉陆 / 接收方
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    接收方 / 目标粉陆或组织
                   </label>
                   <input
                     type="text"
-                    value={composeTargetNation}
-                    onChange={(e) => setComposeTargetNation(e.target.value)}
-                    placeholder="输入目标粉陆名称、创作者账号或【全域公开通报】"
-                    className="w-full px-3 py-2 text-xs text-slate-900 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                    value={composeRecipient}
+                    onChange={(e) => setComposeRecipient(e.target.value)}
+                    placeholder="例如：北境同盟、西境公国或全域通报"
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
-                {/* Title */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    牒文题头
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    牒文主题
                   </label>
                   <input
                     type="text"
                     value={composeTitle}
                     onChange={(e) => setComposeTitle(e.target.value)}
-                    placeholder="例如：关于建立经贸走廊及战略互信的倡议书"
-                    className="w-full px-3 py-2 text-xs text-slate-900 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+                    placeholder="例如：关于共同防空协定的议案"
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
-                {/* Body Content */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    正文细节与条款
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    详细国书正文
                   </label>
                   <textarea
-                    rows={5}
+                    rows={4}
                     value={composeContent}
                     onChange={(e) => setComposeContent(e.target.value)}
-                    placeholder="请阐述具体的战略合作项、条约细则或致辞内容..."
-                    className="w-full px-3 py-2 text-xs text-slate-900 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 resize-none font-mono"
+                    placeholder="阐述具体公文细则、战略诉求与换约倡议..."
+                    className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 resize-none font-sans"
                   />
                 </div>
 
-                <div className="pt-2 flex items-center justify-end gap-2.5">
+                <div className="pt-2 flex items-center justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => setIsComposeModalOpen(false)}
-                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold cursor-pointer"
                   >
                     取消
                   </button>
+
                   <button
                     type="submit"
-                    disabled={isSending}
-                    className="px-5 py-2 rounded-xl text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
-                    style={{ backgroundColor: settings.themeAccent }}
+                    className="px-5 py-2 rounded-xl bg-[#3B82F6] hover:bg-blue-600 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
                   >
                     <Send className="w-3.5 h-3.5" />
-                    <span>{isSending ? '正在加密发送...' : '发送公牒'}</span>
+                    <span>正式加密送达</span>
                   </button>
                 </div>
               </form>

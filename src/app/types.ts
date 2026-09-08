@@ -221,12 +221,18 @@ export interface ArmyState {
  generals: { id: string; name: string; rank: string; attackBonus: number; defenseBonus: number }[];
 }
 
+export type FlagRatio = '1:1' | '19:10' | '1:2' | '3:2';
+
 export interface Nation {
  id: string;
  ownerId: string;
  ownerUsername: string;
  ownerDouyinName: string;
  name: string;
+ shortName?: string; // 国家简称 (例如 "华", "CHN", "英", "GBR")
+ flagUrl?: string; // 用户上传国旗图片或预设图案
+ flagRatio?: FlagRatio; // 国旗长宽比：'1:1' | '19:10' | '1:2' | '3:2'
+ nationType?: string; // 国家类型 (例如 "民主共和国", "中央集权帝国")
  capital: string;
  territory: string;
  description: string;

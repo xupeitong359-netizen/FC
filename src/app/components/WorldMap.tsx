@@ -111,6 +111,18 @@ interface WorldMapProps {
  onOpenResources?: () => void;
  onToggleFullscreen?: () => void;
  isFullscreen?: boolean;
+ workspaceHighlightNationId?: string | null;
+ onProvinceClick?: (province: { id: string | number; name: string; properties: any; ownerNation?: Nation | null }) => void;
+ isBoxSelectMode?: boolean;
+ onBoxSelectProvinces?: (provinces: { id: string | number; name: string; properties: any }[]) => void;
+ isWorkspaceEditor?: boolean;
+ mapMode?: MapModeType;
+ layerSettings?: {
+  showCountryName?: boolean;
+  showProvinceName?: boolean;
+  showGrid?: boolean;
+  showLegend?: boolean;
+ };
 }
 
 // Built-in simplified world landmasses GeoJSON coordinates for fallback
@@ -272,6 +284,7 @@ interface ProvincePathProps {
  isCreationMode?: boolean;
  isValidCreationTarget?: boolean;
  isNonCore?: boolean;
+ workspaceHighlightNationId?: string | null;
  onHover: (id: any, props: any) => void;
  onUnhover: () => void;
  onClick: (id: any, name: string, properties: any) => void;
@@ -302,6 +315,7 @@ const MemoizedProvincePath = memo(function MemoizedProvincePath({
  isCreationMode = false,
  isValidCreationTarget = false,
  isNonCore = false,
+ workspaceHighlightNationId,
  onHover,
  onUnhover,
  onClick,
@@ -480,15 +494,38 @@ const MemoizedProvincePath = memo(function MemoizedProvincePath({
  } else if (ownerNation) {
   // 经典政务/主权/战线地图模式：建国领土按主权国旗底色渲染
   fill = toModernMapColor(ownerNation.flagColor, mapTheme);
-  // HOI4 半透明自然涂层：透出底色质感
-  fillOpacity = isHovered
-   ? (mapTheme === 'white' ? 0.88 : 0.95)
-   : isNonCore
-   ? (mapTheme === 'white' ? 0.52 : 0.65)
-   : (mapTheme === 'white' ? 0.64 : 0.82);
-  stroke = isHovered ? themeConfig.hoverLandStroke : themeConfig.provinceBorder;
-  strokeWidth = isHovered ? 1.1 : 0.42;
-  strokeOpacity = isHovered ? 0.95 : 0.62;
+  if (workspaceHighlightNationId) {
+   if (ownerNation.id === workspaceHighlightNationId) {
+    // 当前选中国家使用饱满真实的代表色 + 清晰主权边框
+    fillOpacity = isHovered ? 0.95 : 0.85;
+    stroke = isHovered ? '#ffffff' : (ownerNation.flagColor || themeConfig.countryBorder);
+    strokeWidth = isHovered ? 1.8 : 1.2;
+    strokeOpacity = 1;
+   } else {
+    // 其他已创建国家使用低对比度柔和颜色显示
+    fillOpacity = isHovered ? 0.60 : 0.42;
+    stroke = isHovered ? themeConfig.hoverLandStroke : themeConfig.provinceBorder;
+    strokeWidth = isHovered ? 0.75 : 0.35;
+    strokeOpacity = 0.5;
+   }
+  } else {
+   // HOI4 半透明自然涂层：透出底色质感
+   fillOpacity = isHovered
+    ? (mapTheme === 'white' ? 0.88 : 0.95)
+    : isNonCore
+    ? (mapTheme === 'white' ? 0.52 : 0.65)
+    : (mapTheme === 'white' ? 0.64 : 0.82);
+   stroke = isHovered ? themeConfig.hoverLandStroke : themeConfig.provinceBorder;
+   strokeWidth = isHovered ? 1.1 : 0.42;
+   strokeOpacity = isHovered ? 0.95 : 0.62;
+  }
+ } else if (workspaceHighlightNationId) {
+  // 工作区未归属省份：浅色填充 + 柔和交互
+  fill = isHovered ? (mapTheme === 'white' ? '#F1F5F9' : '#1E293B') : (mapTheme === 'white' ? '#F8FAFC' : '#141c2b');
+  stroke = isHovered ? (mapTheme === 'white' ? '#94A3B8' : '#64748B') : (mapTheme === 'white' ? '#E2E8F0' : '#1f2937');
+  strokeWidth = isHovered ? 0.9 : 0.35;
+  strokeOpacity = isHovered ? 0.9 : 0.6;
+  fillOpacity = 1;
  } else if (isHovered) {
   fill = themeConfig.hoverLandFill;
   stroke = themeConfig.hoverLandStroke;
@@ -522,7 +559,7 @@ const MemoizedProvincePath = memo(function MemoizedProvincePath({
     style={{
      transition: 'fill 400ms cubic-bezier(0.4, 0, 0.2, 1), stroke 400ms cubic-bezier(0.4, 0, 0.2, 1), fill-opacity 200ms ease',
     }}
-    onMouseEnter={() => onHover(stateId, properties)}
+    onMouseEnter={() => onHover(stateId, { ...(properties || {}), id: stateId, name, ownerNation })}
     onMouseLeave={onUnhover}
     onClick={() => onClick(stateId, name, properties)}
    />
@@ -759,13 +796,38 @@ export const WorldMap: React.FC<WorldMapProps> = ({
  onOpenResources,
  onToggleFullscreen,
  isFullscreen = false,
+ workspaceHighlightNationId,
+ onProvinceClick,
+ isBoxSelectMode = false,
+ onBoxSelectProvinces,
+ isWorkspaceEditor = false,
+ mapMode: propMapMode,
+ layerSettings: propLayerSettings,
 }) => {
+ const [boxSelectStart, setBoxSelectStart] = useState<{ x: number; y: number } | null>(null);
+ const [boxSelectCurrent, setBoxSelectCurrent] = useState<{ x: number; y: number } | null>(null);
  const [geoData, setGeoData] = useState<any>(null);
  const { settings } = useAppSettings();
  const mapTheme = settings.mapTheme;
  const setMapTheme = (nextTheme: MapVisualTheme) => updateAppSettings({ mapTheme: nextTheme });
  const currentTheme = MAP_THEMES[mapTheme];
- const [mapMode, setMapMode] = useState<MapModeType>('political');
+ const [internalMapMode, setInternalMapMode] = useState<MapModeType>('political');
+ const [internalLayerSettings, setInternalLayerSettings] = useState({
+  showCountryName: true,
+  showProvinceName: true,
+  showGrid: false,
+  showLegend: true,
+ });
+
+ const mapMode = propMapMode !== undefined ? propMapMode : internalMapMode;
+ const setMapMode = setInternalMapMode;
+
+ const effectiveLayerSettings = useMemo(() => ({
+  showCountryName: propLayerSettings?.showCountryName ?? internalLayerSettings.showCountryName,
+  showProvinceName: propLayerSettings?.showProvinceName ?? internalLayerSettings.showProvinceName,
+  showGrid: propLayerSettings?.showGrid ?? internalLayerSettings.showGrid,
+  showLegend: propLayerSettings?.showLegend ?? internalLayerSettings.showLegend,
+ }), [propLayerSettings, internalLayerSettings]);
  const [isPeacefulExpansion, setIsPeacefulExpansion] = useState(false);
  const [showExpansionInfo, setShowExpansionInfo] = useState(false);
  const [expansionSuccessData, setExpansionSuccessData] = useState<{ provinceName: string; isCore: boolean } | null>(null);
@@ -1114,6 +1176,13 @@ export const WorldMap: React.FC<WorldMapProps> = ({
    return;
   }
 
+  if (isBoxSelectMode && e.touches.length === 1) {
+   const pt = getSvgPoint(e.touches[0].clientX, e.touches[0].clientY);
+   setBoxSelectStart(pt);
+   setBoxSelectCurrent(pt);
+   return;
+  }
+
   if (e.touches.length === 1) {
    setIsDragging(true);
    dragStartCoordRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -1132,6 +1201,12 @@ export const WorldMap: React.FC<WorldMapProps> = ({
  };
 
  const handleTouchMove = (e: React.TouchEvent) => {
+  if (isBoxSelectMode && boxSelectStart && e.touches.length === 1) {
+   const pt = getSvgPoint(e.touches[0].clientX, e.touches[0].clientY);
+   setBoxSelectCurrent(pt);
+   return;
+  }
+
   if (e.touches.length === 1 && isDragging) {
    if (dragStartCoordRef.current) {
     const dist = Math.hypot(
@@ -1163,6 +1238,42 @@ export const WorldMap: React.FC<WorldMapProps> = ({
  };
 
  const handleTouchEnd = () => {
+  if (isBoxSelectMode && boxSelectStart && boxSelectCurrent) {
+   const minSvgX = Math.min(boxSelectStart.x, boxSelectCurrent.x);
+   const maxSvgX = Math.max(boxSelectStart.x, boxSelectCurrent.x);
+   const minSvgY = Math.min(boxSelectStart.y, boxSelectCurrent.y);
+   const maxSvgY = Math.max(boxSelectStart.y, boxSelectCurrent.y);
+
+   if (Math.abs(maxSvgX - minSvgX) > 6 || Math.abs(maxSvgY - minSvgY) > 6) {
+    const geoX0 = (minSvgX - pan.x) / zoom;
+    const geoX1 = (maxSvgX - pan.x) / zoom;
+    const geoY0 = (minSvgY - pan.y) / zoom;
+    const geoY1 = (maxSvgY - pan.y) / zoom;
+
+    const hitFeatures = precalculatedFeatures.filter((item) => {
+     if (item.centroid) {
+      const [cx, cy] = item.centroid;
+      if (cx >= geoX0 && cx <= geoX1 && cy >= geoY0 && cy <= geoY1) return true;
+     }
+     const [[bx0, by0], [bx1, by1]] = item.bounds;
+     return !(bx1 < geoX0 || bx0 > geoX1 || by1 < geoY0 || by0 > geoY1);
+    });
+
+    if (hitFeatures.length > 0) {
+     onBoxSelectProvinces?.(
+      hitFeatures.map((f) => ({
+       id: f.stateId,
+       name: f.name,
+       properties: f.properties,
+      }))
+     );
+    }
+   }
+   setBoxSelectStart(null);
+   setBoxSelectCurrent(null);
+   return;
+  }
+
   setIsDragging(false);
   setIsPinching(false);
   pinchStartDistRef.current = null;
@@ -1178,6 +1289,14 @@ export const WorldMap: React.FC<WorldMapProps> = ({
   if (targetEl?.closest('#province-detail-panel, [data-interactive-overlay], .custom-scrollbar, #geopolitical-factions-sidebar, button, input, select, textarea')) {
    return;
   }
+
+  if (isBoxSelectMode) {
+   const pt = getSvgPoint(e.clientX, e.clientY);
+   setBoxSelectStart(pt);
+   setBoxSelectCurrent(pt);
+   return;
+  }
+
   setIsDragging(true);
   dragStartCoordRef.current = { x: e.clientX, y: e.clientY };
   hasDraggedRef.current = false;
@@ -1186,6 +1305,12 @@ export const WorldMap: React.FC<WorldMapProps> = ({
  };
 
  const handleMouseMove = (e: React.MouseEvent) => {
+  if (isBoxSelectMode && boxSelectStart) {
+   const pt = getSvgPoint(e.clientX, e.clientY);
+   setBoxSelectCurrent(pt);
+   return;
+  }
+
   if (!isDragging) return;
   if (dragStartCoordRef.current) {
    const dist = Math.hypot(
@@ -1204,6 +1329,42 @@ export const WorldMap: React.FC<WorldMapProps> = ({
  };
 
  const handleMouseUp = () => {
+  if (isBoxSelectMode && boxSelectStart && boxSelectCurrent) {
+   const minSvgX = Math.min(boxSelectStart.x, boxSelectCurrent.x);
+   const maxSvgX = Math.max(boxSelectStart.x, boxSelectCurrent.x);
+   const minSvgY = Math.min(boxSelectStart.y, boxSelectCurrent.y);
+   const maxSvgY = Math.max(boxSelectStart.y, boxSelectCurrent.y);
+
+   if (Math.abs(maxSvgX - minSvgX) > 6 || Math.abs(maxSvgY - minSvgY) > 6) {
+    const geoX0 = (minSvgX - pan.x) / zoom;
+    const geoX1 = (maxSvgX - pan.x) / zoom;
+    const geoY0 = (minSvgY - pan.y) / zoom;
+    const geoY1 = (maxSvgY - pan.y) / zoom;
+
+    const hitFeatures = precalculatedFeatures.filter((item) => {
+     if (item.centroid) {
+      const [cx, cy] = item.centroid;
+      if (cx >= geoX0 && cx <= geoX1 && cy >= geoY0 && cy <= geoY1) return true;
+     }
+     const [[bx0, by0], [bx1, by1]] = item.bounds;
+     return !(bx1 < geoX0 || bx0 > geoX1 || by1 < geoY0 || by0 > geoY1);
+    });
+
+    if (hitFeatures.length > 0) {
+     onBoxSelectProvinces?.(
+      hitFeatures.map((f) => ({
+       id: f.stateId,
+       name: f.name,
+       properties: f.properties,
+      }))
+     );
+    }
+   }
+   setBoxSelectStart(null);
+   setBoxSelectCurrent(null);
+   return;
+  }
+
   setIsDragging(false);
   setTimeout(() => {
    hasDraggedRef.current = false;
@@ -1231,9 +1392,143 @@ export const WorldMap: React.FC<WorldMapProps> = ({
   });
  };
 
+ const oceanColorRef = useRef(currentTheme.ocean);
+ oceanColorRef.current = currentTheme.ocean;
+
+ const handleDownloadPureMap = useCallback((e?: any) => {
+  if (!svgRef.current) return;
+  try {
+   const svgEl = svgRef.current;
+   const containerEl = containerRef.current || svgEl.parentElement;
+   const containerRect = containerEl?.getBoundingClientRect();
+   const exportW = Math.round(containerRect?.width || svgEl.clientWidth || 1920);
+   const exportH = Math.round(containerRect?.height || svgEl.clientHeight || 1080);
+
+   const clone = svgEl.cloneNode(true) as SVGSVGElement;
+   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+   clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+   clone.setAttribute('width', String(exportW));
+   clone.setAttribute('height', String(exportH));
+
+   // 确保在纯净地图最底层填充当前海洋底色
+   const oceanColor = oceanColorRef.current || '#0f172a';
+   const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+   bgRect.setAttribute('x', '0');
+   bgRect.setAttribute('y', '0');
+   bgRect.setAttribute('width', '100%');
+   bgRect.setAttribute('height', '100%');
+   bgRect.setAttribute('fill', oceanColor);
+   clone.insertBefore(bgRect, clone.firstChild);
+
+   const serializer = new XMLSerializer();
+   const svgString = serializer.serializeToString(clone);
+
+   const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+   const blobURL = URL.createObjectURL(svgBlob);
+
+   const img = new Image();
+   img.crossOrigin = 'anonymous';
+
+   img.onload = () => {
+    try {
+     const scale = 2; // Retina 2x 高清采样
+     const canvas = document.createElement('canvas');
+     canvas.width = exportW * scale;
+     canvas.height = exportH * scale;
+     const ctx = canvas.getContext('2d');
+     if (!ctx) {
+      URL.revokeObjectURL(blobURL);
+      return;
+     }
+
+     ctx.imageSmoothingEnabled = true;
+     ctx.imageSmoothingQuality = 'high';
+     ctx.fillStyle = oceanColor;
+     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+     URL.revokeObjectURL(blobURL);
+
+     canvas.toBlob((blob) => {
+      if (!blob) return;
+      const targetName = e?.detail?.fileName || `纯净沙盘地图_${new Date().toISOString().slice(0, 10)}.png`;
+      const a = document.createElement('a');
+      a.download = targetName;
+      a.href = URL.createObjectURL(blob);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+
+      window.dispatchEvent(new CustomEvent('map-download-finished', {
+       detail: { success: true, fileName: targetName }
+      }));
+     }, 'image/png');
+    } catch (rasterErr) {
+     URL.revokeObjectURL(blobURL);
+     console.error('Raster map error:', rasterErr);
+    }
+   };
+
+   img.onerror = (err) => {
+    URL.revokeObjectURL(blobURL);
+    console.error('Failed to load SVG for export:', err);
+   };
+
+   img.src = blobURL;
+  } catch (err) {
+   console.error('Download pure map error:', err);
+  }
+ }, []);
+
  const handleResetView = () => {
   setView(DEFAULT_EUROPE_VIEW);
  };
+
+ useEffect(() => {
+  const onZoomIn = () => applyZoom(1.3);
+  const onZoomOut = () => applyZoom(0.7);
+  const onReset = () => handleResetView();
+  const onJumpContinent = (e: any) => {
+   if (e.detail?.zoom !== undefined && e.detail?.pan) {
+    setView({ zoom: e.detail.zoom, pan: e.detail.pan });
+   }
+  };
+  const onSetLayer = (e: any) => {
+   if (e.detail?.mode) {
+    setMapMode(e.detail.mode);
+   }
+   if (e.detail?.settings) {
+    setInternalLayerSettings((prev) => ({ ...prev, ...e.detail.settings }));
+   }
+  };
+  const onSetLayerSettings = (e: any) => {
+   if (e.detail) {
+    setInternalLayerSettings((prev) => ({ ...prev, ...e.detail }));
+   }
+  };
+  const onDownloadMap = (e: any) => {
+   handleDownloadPureMap(e);
+  };
+
+  window.addEventListener('map-zoom-in', onZoomIn);
+  window.addEventListener('map-zoom-out', onZoomOut);
+  window.addEventListener('map-reset-view', onReset);
+  window.addEventListener('map-jump-continent', onJumpContinent);
+  window.addEventListener('map-set-layer', onSetLayer);
+  window.addEventListener('map-set-layer-settings', onSetLayerSettings);
+  window.addEventListener('map-download-current-view', onDownloadMap);
+
+  return () => {
+   window.removeEventListener('map-zoom-in', onZoomIn);
+   window.removeEventListener('map-zoom-out', onZoomOut);
+   window.removeEventListener('map-reset-view', onReset);
+   window.removeEventListener('map-jump-continent', onJumpContinent);
+   window.removeEventListener('map-set-layer', onSetLayer);
+   window.removeEventListener('map-set-layer-settings', onSetLayerSettings);
+   window.removeEventListener('map-download-current-view', onDownloadMap);
+  };
+ }, [handleDownloadPureMap]);
 
  const handleNationJump = (nation: Nation) => {
   const pt = findNationCapitalPoint(nation, geoData, pathGenerator, projection, width, height);
@@ -1641,6 +1936,11 @@ export const WorldMap: React.FC<WorldMapProps> = ({
    return;
   }
   
+  if (onProvinceClick) {
+   onProvinceClick({ id, name, properties, ownerNation });
+   return;
+  }
+
   if (id && name) {
    const event = new CustomEvent('map-province-click', {
     detail: { id, name, properties },
@@ -1762,6 +2062,7 @@ export const WorldMap: React.FC<WorldMapProps> = ({
    isCreationMode={isCreationMode}
    isValidCreationTarget={isValidCreationTarget}
    isNonCore={isNonCore}
+   workspaceHighlightNationId={workspaceHighlightNationId}
    onHover={handleProvinceHover}
    onUnhover={handleProvinceUnhover}
    onClick={handleProvinceClick}
@@ -1786,6 +2087,7 @@ export const WorldMap: React.FC<WorldMapProps> = ({
   selectedProvince,
   validExpansionIds,
   validCreationIds,
+  workspaceHighlightNationId,
  ]);
 
  return (
@@ -1892,7 +2194,9 @@ export const WorldMap: React.FC<WorldMapProps> = ({
    </AnimatePresence>
 
    {/* TOP COMMAND HUD: 日期 → 核心行动 → 国家资源 */}
-   <div className="absolute top-2 left-2 right-2 sm:top-2.5 sm:left-3.5 sm:right-3.5 z-30 flex items-center justify-between pointer-events-none gap-2">
+   {!isWorkspaceEditor && (
+    <>
+    <div className="absolute top-2 left-2 right-2 sm:top-2.5 sm:left-3.5 sm:right-3.5 z-30 flex items-center justify-between pointer-events-none gap-2">
     {/* Left: Campaign Clock + Strategic Action Modules (嵌入式大战略 HUD) */}
     <div className="pointer-events-auto flex items-center gap-1 sm:gap-1.5">
      {/* Campaign Date & Threat Status Instrument Module */}
@@ -1916,78 +2220,6 @@ export const WorldMap: React.FC<WorldMapProps> = ({
        </span>
       </div>
      </div>
-
-     {/* HUD System Module 1: Army (陆军) */}
-     {onOpenArmyCommand && (
-      <button
-       id="map-army-command-btn"
-       type="button"
-       onClick={(e) => {
-        e.stopPropagation();
-        onOpenArmyCommand();
-       }}
-       className="px-2.5 py-1 rounded-lg bg-white/95 hover:bg-rose-50/80 text-slate-800 border border-slate-200/90 hover:border-rose-200 backdrop-blur-md shadow-xs flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer group active:scale-95"
-       title="进入陆军最高指挥部"
-      >
-       <Swords className="w-3.5 h-3.5 text-rose-600 shrink-0 group-hover:scale-110 transition-transform" />
-       <div className="flex flex-col items-start leading-none">
-        <span className="text-[9px] text-slate-500 font-semibold tracking-wider leading-none">
-         陆军
-        </span>
-        <span className="font-mono text-xs font-black text-slate-900 tabular-nums mt-0.5 leading-none">
-         {formattedArmyManpower}
-        </span>
-       </div>
-      </button>
-     )}
-
-     {/* HUD System Module 2: Construction (建设) */}
-     {onOpenConstruction && (
-      <button
-       id="map-floating-construction-btn"
-       type="button"
-       onClick={(e) => {
-        e.stopPropagation();
-        onOpenConstruction();
-       }}
-       className="px-2.5 py-1 rounded-lg bg-white/95 hover:bg-amber-50/80 text-slate-800 border border-slate-200/90 hover:border-amber-200 backdrop-blur-md shadow-xs flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer group active:scale-95"
-       title="进入国家战略筑造中心"
-      >
-       <Hammer className="w-3.5 h-3.5 text-amber-600 shrink-0 group-hover:rotate-12 transition-transform" />
-       <div className="flex flex-col items-start leading-none">
-        <span className="text-[9px] text-slate-500 font-semibold tracking-wider leading-none">
-         建设
-        </span>
-        <span className="font-mono text-xs font-black text-slate-900 tabular-nums mt-0.5 leading-none">
-         {totalCivFactories}
-        </span>
-       </div>
-      </button>
-     )}
-
-     {/* HUD System Module 3: Strategic Resources (战略资源) */}
-     {onOpenResources && (
-      <button
-       id="map-floating-resources-btn"
-       type="button"
-       onClick={(e) => {
-        e.stopPropagation();
-        onOpenResources();
-       }}
-       className="px-2.5 py-1 rounded-lg bg-white/95 hover:bg-sky-50/80 text-slate-800 border border-slate-200/90 hover:border-sky-200 backdrop-blur-md shadow-xs flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer group active:scale-95"
-       title="进入国家战略资源储备中枢"
-      >
-       <Boxes className="w-3.5 h-3.5 text-sky-600 shrink-0 group-hover:scale-110 transition-transform" />
-       <div className="flex flex-col items-start leading-none">
-        <span className="text-[9px] text-slate-500 font-semibold tracking-wider leading-none">
-         战略资源
-        </span>
-        <span className="font-mono text-xs font-black text-slate-900 tabular-nums mt-0.5 leading-none">
-         {Object.values(calculateNationResourceOverview(myNation)).reduce((s, r) => s + r.stockpile, 0).toLocaleString()}
-        </span>
-       </div>
-      </button>
-     )}
     </div>
 
     {/* Right: Actions (全屏地图 + 世界势力清册) */}
@@ -2277,9 +2509,12 @@ export const WorldMap: React.FC<WorldMapProps> = ({
       </motion.div>
      )}
     </AnimatePresence>
-   </div>
+    </div>
+    </>
+   )}
 
    {/* Floating Vertical HUD Toolbar: Theme Switch + Zoom Controls */}
+   {!isWorkspaceEditor && (
    <motion.div
     key="map-zoom-controls"
     initial={{ opacity: 0, x: 10 }}
@@ -2341,6 +2576,7 @@ export const WorldMap: React.FC<WorldMapProps> = ({
      <RotateCcw className="w-3 h-3" />
     </button>
    </motion.div>
+   )}
 
    {/* Main Interactive SVG Map Viewport */}
    <div
@@ -2477,10 +2713,10 @@ export const WorldMap: React.FC<WorldMapProps> = ({
       }}
      >
       {/* Coordinate Grid lines (toggled by Settings) */}
-      {settings.showGridLines && (
+      {(effectiveLayerSettings.showGrid || settings.showGridLines) && (
        <g
         stroke={currentTheme.grid}
-        strokeWidth={0.75}
+        strokeWidth={0.7}
         strokeDasharray="2 2"
         opacity={0.85}
         style={{ transition: 'all 400ms cubic-bezier(0.4, 0, 0.2, 1)' }}
@@ -2725,58 +2961,99 @@ export const WorldMap: React.FC<WorldMapProps> = ({
       )}
 
       {/* Dynamic Country Name Labels (HOI4-inspired Grand Strategy Map Typography) */}
-      <g id="adaptive-country-labels-layer" className="pointer-events-none select-none">
-       <defs>
-        <filter id="country-label-subtle-shadow" x="-30%" y="-30%" width="160%" height="160%">
-         <feDropShadow dx="0.1" dy="0.15" stdDeviation="0.25" floodColor="#000000" floodOpacity="0.28" />
-        </filter>
-        {countryLabels.map((label) => (
-         <path
-          key={`spine-def-${label.pathId}`}
-          id={label.pathId}
-          d={label.pathD}
-          fill="none"
-          stroke="none"
-         />
-        ))}
-       </defs>
-       {countryLabels.map((label) => {
-        return (
-         <text
-          key={`country-label-${label.nation.id}`}
-          dominantBaseline="central"
-          textAnchor="middle"
-          fill={currentTheme.labelColor}
-          fillOpacity={label.opacity}
-          filter="url(#country-label-subtle-shadow)"
-          style={{
-           fontFamily: '"Barlow Condensed", "Cinzel", "Oswald", "Noto Sans SC", "PingFang SC", "Heiti SC", sans-serif',
-           fontStretch: 'condensed',
-           textTransform: 'uppercase',
-           transition: 'fill-opacity 240ms ease',
-          }}
-          stroke={currentTheme.labelStroke}
-          strokeWidth={Math.max(0.18, label.fontSize * 0.042)}
-          strokeOpacity={0.92}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          paintOrder="stroke fill"
-          fontSize={label.fontSize}
-          fontWeight="700"
-          letterSpacing={`${label.letterSpacing}px`}
-          className="select-none pointer-events-none"
-         >
-          <textPath
-           href={`#${label.pathId}`}
-           startOffset="50%"
+      {effectiveLayerSettings.showCountryName && (
+       <g id="adaptive-country-labels-layer" className="pointer-events-none select-none">
+        <defs>
+         <filter id="country-label-subtle-shadow" x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="0.1" dy="0.15" stdDeviation="0.25" floodColor="#000000" floodOpacity="0.28" />
+         </filter>
+         {countryLabels.map((label) => (
+          <path
+           key={`spine-def-${label.pathId}`}
+           id={label.pathId}
+           d={label.pathD}
+           fill="none"
+           stroke="none"
+          />
+         ))}
+        </defs>
+        {countryLabels.map((label) => {
+         return (
+          <text
+           key={`country-label-${label.pathId}`}
+           dominantBaseline="central"
            textAnchor="middle"
+           fill={currentTheme.labelColor}
+           fillOpacity={label.opacity}
+           filter="url(#country-label-subtle-shadow)"
+           style={{
+            fontFamily: '"Barlow Condensed", "Cinzel", "Oswald", "Noto Sans SC", "PingFang SC", "Heiti SC", sans-serif',
+            fontStretch: 'condensed',
+            textTransform: 'uppercase',
+            transition: 'fill-opacity 240ms ease',
+           }}
+           stroke={currentTheme.labelStroke}
+           strokeWidth={Math.max(0.18, label.fontSize * 0.042)}
+           strokeOpacity={0.92}
+           strokeLinejoin="round"
+           strokeLinecap="round"
+           paintOrder="stroke fill"
+           fontSize={label.fontSize}
+           fontWeight="700"
+           letterSpacing={`${label.letterSpacing}px`}
+           className="select-none pointer-events-none"
           >
-           {label.displayText}
-          </textPath>
-         </text>
-        );
-       })}
-      </g>
+           <textPath
+            href={`#${label.pathId}`}
+            startOffset="50%"
+            textAnchor="middle"
+           >
+            {label.displayText}
+           </textPath>
+          </text>
+         );
+        })}
+       </g>
+      )}
+
+      {/* Dynamic Province Name Labels (toggled by Layer Settings) */}
+      {effectiveLayerSettings.showProvinceName && (
+       <g id="adaptive-province-labels-layer" className="pointer-events-none select-none">
+        {precalculatedFeatures.map((item) => {
+         const { stateId, name, centroid, area } = item;
+         if (!centroid || !name) return null;
+         const [cx, cy] = centroid;
+         if (isNaN(cx) || isNaN(cy)) return null;
+
+         const baseSize = area > 180 ? 3.0 : 2.4;
+         const fontSize = Math.max(1.5, Math.min(4.2, baseSize / Math.sqrt(Math.max(0.65, zoom))));
+
+         return (
+          <text
+           key={`prov-label-${stateId}`}
+           x={cx}
+           y={cy}
+           textAnchor="middle"
+           dominantBaseline="central"
+           fill={mapTheme === 'white' ? '#334155' : '#E2E8F0'}
+           stroke={mapTheme === 'white' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 23, 42, 0.95)'}
+           strokeWidth={fontSize * 0.24}
+           paintOrder="stroke fill"
+           strokeLinejoin="round"
+           fontSize={fontSize}
+           fontWeight="600"
+           className="select-none pointer-events-none"
+           style={{
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            opacity: 0.92,
+           }}
+          >
+           {name}
+          </text>
+         );
+        })}
+       </g>
+      )}
 
       {/* Plotted Nation Capital Markers & Tactical Capital Hubs (纯矢量极简随地图缩放) */}
       <g id="nation-markers-layer">
@@ -3030,8 +3307,106 @@ export const WorldMap: React.FC<WorldMapProps> = ({
        </g>
       )}
      </g>
+
+     {/* 框选矩形框 (Box Selection Overlay) */}
+     {isBoxSelectMode && boxSelectStart && boxSelectCurrent && (
+      <rect
+       x={Math.min(boxSelectStart.x, boxSelectCurrent.x)}
+       y={Math.min(boxSelectStart.y, boxSelectCurrent.y)}
+       width={Math.abs(boxSelectCurrent.x - boxSelectStart.x)}
+       height={Math.abs(boxSelectCurrent.y - boxSelectStart.y)}
+       fill="rgba(99, 102, 241, 0.18)"
+       stroke="#4f46e5"
+       strokeWidth={2}
+       strokeDasharray="5 3"
+       rx={3}
+       pointerEvents="none"
+      />
+     )}
     </svg>
    </div>
+
+   {/* 工作区沙盘专属图例浮动面板 (受 effectiveLayerSettings.showLegend 严格控制) */}
+   {isWorkspaceEditor && effectiveLayerSettings.showLegend && (
+    <div className="absolute bottom-16 left-3 sm:left-4 z-20 pointer-events-auto select-none max-w-[calc(100vw-2rem)] sm:max-w-md animate-fadeIn">
+     {mapMode === 'population' && (
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/95 text-slate-700 backdrop-blur-md border border-slate-200/90 rounded-xl shadow-md text-[11px] flex-wrap">
+       <span className="text-slate-900 font-bold mr-0.5">人口阶梯:</span>
+       {[
+        { label: '<40万', color: '#a7f3d0' },
+        { label: '40-90万', color: '#34d399' },
+        { label: '90-180万', color: '#10b981' },
+        { label: '180-350万', color: '#059669' },
+        { label: '350-600万', color: '#047857' },
+        { label: '>600万', color: '#064e3b' },
+       ].map((t) => (
+        <span key={t.label} className="flex items-center gap-1">
+         <span className="w-2.5 h-2.5 rounded-xs shrink-0" style={{ backgroundColor: t.color }} />
+         <span className="text-slate-600 font-medium text-[10px]">{t.label}</span>
+        </span>
+       ))}
+      </div>
+     )}
+     {mapMode === 'industrial' && (
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/95 text-slate-700 backdrop-blur-md border border-slate-200/90 rounded-xl shadow-md text-[11px] flex-wrap">
+       <span className="text-slate-900 font-bold mr-0.5">工业产能:</span>
+       {[
+        { label: '0厂', color: '#64748b' },
+        { label: '1-2厂', color: '#d97706' },
+        { label: '3-5厂', color: '#2563eb' },
+        { label: '6+厂', color: '#15803d' },
+       ].map((t) => (
+        <span key={t.label} className="flex items-center gap-1">
+         <span className="w-2.5 h-2.5 rounded-xs shrink-0" style={{ backgroundColor: t.color }} />
+         <span className="text-slate-600 font-medium text-[10px]">{t.label}</span>
+        </span>
+       ))}
+      </div>
+     )}
+     {mapMode === 'resources' && (
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/95 text-slate-700 backdrop-blur-md border border-slate-200/90 rounded-xl shadow-md text-[11px] flex-wrap">
+       <span className="text-slate-900 font-bold mr-0.5">战略资源:</span>
+       {Object.values(STRATEGIC_RESOURCES).map((res) => (
+        <span key={res.id} className="flex items-center gap-1">
+         <span className="w-2.5 h-2.5 rounded-xs shrink-0" style={{ backgroundColor: res.color }} />
+         <span className="text-slate-600 font-medium text-[10px]">{res.name}</span>
+        </span>
+       ))}
+      </div>
+     )}
+     {mapMode === 'terrain' && (
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/95 text-slate-700 backdrop-blur-md border border-slate-200/90 rounded-xl shadow-md text-[11px] flex-wrap">
+       <span className="text-slate-900 font-bold mr-0.5">地形地貌:</span>
+       {[
+        { label: '平原', color: '#86efac' },
+        { label: '丘陵', color: '#fde047' },
+        { label: '山地', color: '#fdba74' },
+        { label: '高原', color: '#fca5a5' },
+        { label: '沙漠', color: '#fef08a' },
+       ].map((t) => (
+        <span key={t.label} className="flex items-center gap-1">
+         <span className="w-2.5 h-2.5 rounded-xs shrink-0" style={{ backgroundColor: t.color }} />
+         <span className="text-slate-600 font-medium text-[10px]">{t.label}</span>
+        </span>
+       ))}
+      </div>
+     )}
+     {mapMode === 'political' && nations.length > 0 && (
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/95 text-slate-700 backdrop-blur-md border border-slate-200/90 rounded-xl shadow-md text-[11px] flex-wrap max-h-24 overflow-y-auto custom-scrollbar">
+       <span className="text-slate-900 font-bold mr-0.5">势力图例:</span>
+       {nations.slice(0, 6).map((nat) => (
+        <span key={nat.id} className="flex items-center gap-1">
+         <span className="w-2.5 h-2.5 rounded-xs shrink-0" style={{ backgroundColor: nat.flagColor || '#3b82f6' }} />
+         <span className="text-slate-700 font-medium text-[10px] truncate max-w-16">{nat.name}</span>
+        </span>
+       ))}
+       {nations.length > 6 && (
+        <span className="text-[9px] text-slate-400 font-mono">+{nations.length - 6}国</span>
+       )}
+      </div>
+     )}
+    </div>
+   )}
 
    {/* Floating Tactical Theater High Command & Stance Controls Panel (左下角战术姿态面板，避开底部中央地球按钮与和平扩张) */}
    {(mapMode === 'military' || (myNation?.activeWars && myNation.activeWars.length > 0)) && (
@@ -3249,6 +3624,86 @@ export const WorldMap: React.FC<WorldMapProps> = ({
       </div>
      )}
     </AnimatePresence>
+
+    {/* Province Hover HUD Card (鼠标悬停省份时显示省份名称、人口、面积等基础数据) */}
+    {hoveredProvinceData && (
+     <div
+      id="province-hover-hud"
+      className="pointer-events-none absolute bottom-4 left-4 z-40 bg-slate-900/92 text-slate-100 border border-slate-700/80 rounded-xl shadow-2xl px-4 py-3 backdrop-blur-md text-xs select-none max-w-xs transition-all duration-200"
+     >
+      {(() => {
+       const provName = hoveredProvinceData.name || '';
+       const provId = hoveredProvinceData.id ?? '';
+       const cnName = getProvinceChineseName(provName || provId);
+       const owner = hoveredProvinceData.ownerNation as Nation | undefined;
+       const terrain = getProvinceTerrain(provId, provName, hoveredProvinceData.properties);
+       const rawPop = (hoveredProvinceData.properties?.manpower as number) ??
+        (hoveredProvinceData.properties?.population as number) ??
+        (owner?.provinces?.find((p: any) => String(p.id) === String(provId) || p.name === provName)?.population) ??
+        (1200000 + Math.abs(Number(provId || 1) * 3821) % 4500000);
+       const popDisplay = rawPop >= 100000000
+        ? `${(rawPop / 100000000).toFixed(2)} 亿`
+        : rawPop >= 10000
+        ? `${(rawPop / 10000).toFixed(1)} 万`
+        : `${rawPop.toLocaleString()}`;
+       const rawArea = hoveredProvinceData.properties?.area_km2
+        ? Math.round(hoveredProvinceData.properties.area_km2)
+        : hoveredProvinceData.properties?.area
+        ? Math.round(hoveredProvinceData.properties.area)
+        : Math.round(25000 + Math.abs(Number(provId || 1) * 317) % 65000);
+
+       return (
+        <>
+         <div className="flex items-center justify-between gap-2 border-b border-slate-700/60 pb-2 mb-2">
+          <div className="flex flex-col">
+           <div className="flex items-center gap-1.5">
+            <span className="font-bold text-sm text-white tracking-wide">{cnName || provName || '未知省份'}</span>
+            {provName && provName !== cnName && (
+             <span className="text-[10px] text-slate-400 font-mono">({provName})</span>
+            )}
+           </div>
+           <span className="text-[10px] text-slate-400 font-mono">地块编号 #{provId || '—'}</span>
+          </div>
+          {owner ? (
+           <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-800/90 border border-slate-700 shrink-0">
+            <span
+             className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs"
+             style={{ backgroundColor: owner.flagColor || '#6366f1' }}
+            />
+            <span className="text-[11px] font-semibold text-slate-200 truncate max-w-[90px]">
+             {owner.name}
+            </span>
+           </div>
+          ) : (
+           <span className="text-[10px] px-2 py-0.5 rounded font-medium bg-slate-800 text-slate-400 border border-slate-700 shrink-0">
+            未分配中立地区
+           </span>
+          )}
+         </div>
+
+         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
+          <div className="flex items-center justify-between">
+           <span className="text-slate-400">总人口:</span>
+           <span className="font-semibold text-amber-300 font-mono">{popDisplay}</span>
+          </div>
+          <div className="flex items-center justify-between">
+           <span className="text-slate-400">土地面积:</span>
+           <span className="font-semibold text-slate-200 font-mono">{rawArea.toLocaleString()} km²</span>
+          </div>
+          <div className="flex items-center justify-between">
+           <span className="text-slate-400">地貌环境:</span>
+           <span className="font-medium text-emerald-300">{terrain.label}</span>
+          </div>
+          <div className="flex items-center justify-between">
+           <span className="text-slate-400">战略地位:</span>
+           <span className="font-medium text-indigo-300">{owner ? '已建制领土' : '中立待划界'}</span>
+          </div>
+         </div>
+        </>
+       );
+      })()}
+     </div>
+    )}
 
     {/* Geopolitical Factions Tactical Sidebar (Non-blocking docked overlay) */}
     <GeopoliticalFactionsSidebar

@@ -176,6 +176,7 @@ function MainApp() {
  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
  const [authDefaultMode, setAuthDefaultMode] = useState<'login' | 'register'>('login');
  const [createNationModalOpen, setCreateNationModalOpen] = useState(false);
+ const [autoStartMapNationMode, setAutoStartMapNationMode] = useState(false);
  const [isMapSelectionMode, setIsMapSelectionMode] = useState(false);
  const [editNationModalOpen, setEditNationModalOpen] = useState(false);
  const [nationToEdit, setNationToEdit] = useState<Nation | null>(null);
@@ -1216,22 +1217,32 @@ function MainApp() {
     user={user}
     onSuccess={(createdWs) => {
      setWorkspaceWizardOpen(false);
-     showToast(`已成功构筑并发布推演沙盘：${createdWs.name}（${createdWs.era}）`);
-     setActiveTab('workspace');
+     showToast(`已成功发布沙盘【${createdWs.name}】，立即启动地图圈地建国！`);
+     // 自动切换至全景地图并开启地图建国流程
+     setActiveTab('world_map');
+     setAutoStartMapNationMode(true);
+     setCreateNationModalOpen(true);
+     setIsMapSelectionMode(true);
     }}
    />
 
    <CreateNationModal
     isOpen={createNationModalOpen}
+    initialMapMode={autoStartMapNationMode}
     onClose={() => {
      setCreateNationModalOpen(false);
+     setAutoStartMapNationMode(false);
      setIsMapSelectionMode(false);
     }}
     onMapModeChange={handleMapModeChange}
-    onEnterMapMode={() => setActiveTab('world_map')}
+    onEnterMapMode={() => {
+     setActiveTab('world_map');
+     setIsMapSelectionMode(true);
+    }}
     onSuccess={() => {
      setIsMapSelectionMode(false);
-     showToast(' 恭喜！您的粉陆已正式开创成立并录入全球大厅！');
+     setAutoStartMapNationMode(false);
+     showToast('🎉 恭喜！您的粉陆已正式开创成立并录入全球大厅！');
      fetchNations();
      setActiveTab('my_nation');
     }}

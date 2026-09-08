@@ -1,4 +1,4 @@
-import { ProvinceStrategicResources } from '../types';
+import { ProvinceStrategicResources, Nation } from '../types';
 
 export interface WorkspaceComment {
   id: string;
@@ -75,6 +75,7 @@ export interface WorkspaceItem {
   comments: WorkspaceComment[];
   chronicles?: WorkspaceChronicle[];
   provinceOverrides?: Record<string, CustomProvinceOverride>;
+  customNations?: Nation[];
 }
 
 const STORAGE_KEY_WORKSPACES = 'chuanglian_workspaces_v1';
@@ -259,6 +260,8 @@ const DEFAULT_INITIAL_WORKSPACE: WorkspaceItem = {
   provinceOverrides: {},
 };
 
+export const MAX_CREATOR_WORKSPACES = 3;
+
 export const workspaceService = {
   getWorkspaces(): WorkspaceItem[] {
     try {
@@ -272,6 +275,59 @@ export const workspaceService = {
     } catch {
       return [DEFAULT_INITIAL_WORKSPACE];
     }
+  },
+
+  // 获取特定创作者自建的剧本列表（排除系统初始剧本）
+  getCreatorWorkspaces(creatorId?: string): WorkspaceItem[] {
+    const list = this.getWorkspaces();
+    return list.filter((w) => {
+      if (w.id === 'ws_default_1936') return false;
+      if (!creatorId) return true;
+      return w.creatorId === creatorId || w.creatorId?.startsWith('usr_creator_') || w.creatorId === 'user_creator';
+    });
+  },
+
+  // 检查创作者是否还可以创建剧本（最多3个，超出需删除自有剧本）
+  canCreateWorkspace(creatorId?: string): { allowed: boolean; currentCount: number; max: number; message?: string } {
+    const myWorkspaces = this.getCreatorWorkspaces(creatorId);
+    const count = myWorkspaces.length;
+    if (count >= MAX_CREATOR_WORKSPACES) {
+      return {
+        allowed: false,
+        currentCount: count,
+        max: MAX_CREATOR_WORKSPACES,
+        message: `单个创作者最多创建 ${MAX_CREATOR_WORKSPACES} 个剧本。您当前已创建 ${count} 个剧本，继续创建需要先删除已有的自建剧本。`,
+      };
+    }
+    return {
+      allowed: true,
+      currentCount: count,
+      max: MAX_CREATOR_WORKSPACES,
+    };
+  },
+
+  // 删除指定的剧本（释放创建名额）
+  deleteWorkspace(id: string): { success: boolean; message?: string } {
+    if (id === 'ws_default_1936') {
+      return { success: false, message: '系统初始基础剧本不可删除' };
+    }
+    const list = this.getWorkspaces();
+    const target = list.find((w) => w.id === id);
+    if (!target) {
+      return { success: false, message: '剧本不存在或已被删除' };
+    }
+
+    const nextList = list.filter((w) => w.id !== id);
+    this.saveWorkspaces(nextList);
+
+    // 如果删除的是当前激活的工作区，自动回退到第一个可用剧本
+    const currentActiveId = this.getActiveWorkspaceId();
+    if (currentActiveId === id) {
+      const fallbackId = nextList[0]?.id || 'ws_default_1936';
+      this.setActiveWorkspaceId(fallbackId);
+    }
+
+    return { success: true, message: `已成功删除剧本【${target.name}】，释放了1个剧本创建配额` };
   },
 
   saveWorkspaces(workspaces: WorkspaceItem[]): void {
@@ -319,6 +375,12 @@ export const workspaceService = {
     creatorId: string;
     creatorName: string;
   }): WorkspaceItem {
+    // 校验创作者创建上限（最多3个剧本）
+    const quotaCheck = this.canCreateWorkspace(payload.creatorId);
+    if (!quotaCheck.allowed) {
+      throw new Error(quotaCheck.message || `单个创作者最多创建 ${MAX_CREATOR_WORKSPACES} 个剧本。已达上限，继续创建需要删除自己的已有剧本。`);
+    }
+
     const list = this.getWorkspaces();
     const wsId = 'ws_' + Math.random().toString(36).substring(2, 9);
     

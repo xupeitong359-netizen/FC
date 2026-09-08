@@ -1003,10 +1003,7 @@ export const api = {
     ) {
      throw new ApiError('请选择或填写国家疆域描述');
     }
-    const maxAllowedProvinces = user.isLingyuBaby ? 11 : 10;
-    if (Array.isArray(p.provinces) && p.provinces.length > maxAllowedProvinces) {
-     throw new ApiError(`最多只能选择 ${maxAllowedProvinces} 个省份作为开创粉陆初始领土`);
-    }
+    // 无限制：允许圈定任意无限多个省份作为初始领土
 
     // First-come-first-served: reject provinces already claimed by another nation.
     if (Array.isArray(p.provinces)) {
@@ -1015,16 +1012,6 @@ export const api = {
       throw new ApiError(
        `省份【${conflict.province?.name || '未知'}】已被【${conflict.occupiedBy.name}】占领，根据先来后到原则，请选择其他未被占领的疆域！`
       );
-     }
-
-     // 核心判定：建国所选省份必须全部相邻且连通一体
-     if (p.provinces.length > 1) {
-      const contiguity = checkProvincesContiguity(p.provinces);
-      if (!contiguity.isContiguous) {
-       throw new ApiError(
-        contiguity.message || '开创粉陆时所选省份必须相邻且连成一体！'
-       );
-      }
      }
     }
 

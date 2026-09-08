@@ -1,4 +1,5 @@
 import { Nation } from '../types';
+import { getProvinceChineseName } from './provinceTranslations';
 
 export type PixelPoint = [number, number];
 
@@ -402,63 +403,162 @@ export function extractTerritorySpinePath(
 const labelMetricsCache = new Map<string, NationLabelSpine>();
 
 /**
- * Groups features into the main contiguous/proximate landmass to exclude far-flung islands/colonies.
+ * Partitions a nation's owned features into geographic clusters (e.g. homeland, overseas colonies, exclaves).
+ * Contiguous features or proximate islands/archipelagos separated by narrow straits (<= 22px) belong to the same cluster.
  */
-function getMainLandmassFeatures(ownedFeatures: any[]): any[] {
-  if (ownedFeatures.length <= 1) return ownedFeatures;
-  
-  // Sort by area descending
-  const sorted = [...ownedFeatures].sort((a, b) => b.area - a.area);
-  const primary = sorted[0];
-  
-  const mainCluster = [primary];
-  const clusterBounds = {
-    minX: primary.bounds[0][0],
-    minY: primary.bounds[0][1],
-    maxX: primary.bounds[1][0],
-    maxY: primary.bounds[1][1],
-  };
+export function partitionNationClusters<T extends {
+  feature: any;
+  stateId: any;
+  name: string;
+  centroid: [number, number] | null;
+  bounds: [[number, number], [number, number]];
+  area: number;
+}>(
+  nation: Nation,
+  ownedFeatures: T[]
+): Array<{
+  features: T[];
+  totalArea: number;
+  isCapitalOrMainland: boolean;
+}> {
+  if (!ownedFeatures.length) return [];
+  if (ownedFeatures.length === 1) {
+    return [{
+      features: ownedFeatures,
+      totalArea: ownedFeatures[0].area,
+      isCapitalOrMainland: true,
+    }];
+  }
 
-  // Expand cluster by including features that are "close" to the current cluster bounds
-  let added = true;
-  while (added) {
-    added = false;
-    for (let i = 0; i < sorted.length; i++) {
-      const feat = sorted[i];
-      if (mainCluster.includes(feat)) continue;
-      
-      const b = feat.bounds;
-      // Allow a gap of roughly 15% of the cluster's current dimension
-      const gapX = (clusterBounds.maxX - clusterBounds.minX) * 0.15 + 2;
-      const gapY = (clusterBounds.maxY - clusterBounds.minY) * 0.15 + 2;
-      
-      const overlaps = !(
-        b[1][0] < clusterBounds.minX - gapX ||
-        b[0][0] > clusterBounds.maxX + gapX ||
-        b[1][1] < clusterBounds.minY - gapY ||
-        b[0][1] > clusterBounds.maxY + gapY
-      );
-      
-      if (overlaps) {
-        mainCluster.push(feat);
-        clusterBounds.minX = Math.min(clusterBounds.minX, b[0][0]);
-        clusterBounds.minY = Math.min(clusterBounds.minY, b[0][1]);
-        clusterBounds.maxX = Math.max(clusterBounds.maxX, b[1][0]);
-        clusterBounds.maxY = Math.max(clusterBounds.maxY, b[1][1]);
-        added = true;
+  const n = ownedFeatures.length;
+  const parent = Array.from({ length: n }, (_, i) => i);
+
+  function find(i: number): number {
+    if (parent[i] === i) return i;
+    parent[i] = find(parent[i]);
+    return parent[i];
+  }
+
+  function union(i: number, j: number) {
+    const rootI = find(i);
+    const rootJ = find(j);
+    if (rootI !== rootJ) {
+      parent[rootI] = rootJ;
+    }
+  }
+
+  // Two features belong to the same cluster if they touch, share boundaries, or are close coastal neighbors (<= 22px)
+  for (let i = 0; i < n; i++) {
+    const featA = ownedFeatures[i];
+    const [tlA, brA] = featA.bounds;
+    for (let j = i + 1; j < n; j++) {
+      const featB = ownedFeatures[j];
+      const [tlB, brB] = featB.bounds;
+
+      const gapX = Math.max(0, tlA[0] - brB[0], tlB[0] - brA[0]);
+      const gapY = Math.max(0, tlA[1] - brB[1], tlB[1] - brA[1]);
+      const dist = Math.hypot(gapX, gapY);
+
+      if (dist <= 22) {
+        union(i, j);
       }
     }
   }
-  
-  return mainCluster;
+
+  // Group by connected root
+  const clusterMap = new Map<number, T[]>();
+  for (let i = 0; i < n; i++) {
+    const root = find(i);
+    let list = clusterMap.get(root);
+    if (!list) {
+      list = [];
+      clusterMap.set(root, list);
+    }
+    list.push(ownedFeatures[i]);
+  }
+
+  const rawClusters = Array.from(clusterMap.values()).map((features) => {
+    const totalArea = features.reduce((sum, f) => sum + f.area, 0);
+    return {
+      features,
+      totalArea,
+      isCapitalOrMainland: false,
+    };
+  });
+
+  // Sort clusters descending by total area
+  rawClusters.sort((a, b) => b.totalArea - a.totalArea);
+
+  // Identify capital / mainland cluster:
+  // 1. If nation.capital is set, find if any cluster contains the capital province (supports Chinese name, English name, and stateId)
+  const capitalStr = (nation.capital || '').trim().toLowerCase();
+  const rawCapId = capitalStr.replace(/\D/g, '');
+  let capitalClusterIndex = -1;
+
+  if (capitalStr) {
+    capitalClusterIndex = rawClusters.findIndex((c) =>
+      c.features.some((f) => {
+        const name = String(f.name || '').trim().toLowerCase();
+        const stateId = String(f.stateId || '').trim();
+        const origName = String(f.feature?.properties?.name || '').trim().toLowerCase();
+        const zhName = getProvinceChineseName(stateId, f.name).toLowerCase();
+        return (
+          name === capitalStr ||
+          name.includes(capitalStr) ||
+          capitalStr.includes(name) ||
+          origName === capitalStr ||
+          origName.includes(capitalStr) ||
+          capitalStr.includes(origName) ||
+          zhName === capitalStr ||
+          zhName.includes(capitalStr) ||
+          capitalStr.includes(zhName) ||
+          (rawCapId && stateId === rawCapId)
+        );
+      })
+    );
+  }
+
+  // 2. If capital not found in clusters, try first designated province in nation.provinces (traditional homeland)
+  if (capitalClusterIndex < 0 && nation.provinces && nation.provinces.length > 0) {
+    const firstProv = nation.provinces[0];
+    const firstProvId = String(firstProv?.id || '').trim();
+    const firstProvName = String(firstProv?.name || '').trim().toLowerCase();
+    if (firstProvId || firstProvName) {
+      capitalClusterIndex = rawClusters.findIndex((c) =>
+        c.features.some((f) => {
+          const stateId = String(f.stateId || '').trim();
+          const name = String(f.name || '').trim().toLowerCase();
+          return (firstProvId && stateId === firstProvId) || (firstProvName && name === firstProvName);
+        })
+      );
+    }
+  }
+
+  // Designate the capital/homeland cluster; default to the largest cluster
+  if (capitalClusterIndex >= 0) {
+    rawClusters[capitalClusterIndex].isCapitalOrMainland = true;
+  } else if (rawClusters.length > 0) {
+    rawClusters[0].isCapitalOrMainland = true;
+  }
+
+  return rawClusters;
 }
 
 /**
- * Calculates or retrieves cached geometry metrics for a single nation.
+ * Backward compatibility helper
+ */
+export function getMainLandmassFeatures(ownedFeatures: any[]): any[] {
+  if (ownedFeatures.length <= 1) return ownedFeatures;
+  const sorted = [...ownedFeatures].sort((a, b) => b.area - a.area);
+  return [sorted[0]];
+}
+
+/**
+ * Calculates or retrieves cached geometry metrics for a cluster of provinces.
  */
 export function getNationLabelSpine(
   nation: Nation,
-  ownedFeatures: Array<{
+  clusterFeatures: Array<{
     feature: any;
     stateId: any;
     name: string;
@@ -466,24 +566,22 @@ export function getNationLabelSpine(
     bounds: [[number, number], [number, number]];
     area: number;
   }>,
-  projection: any
+  projection: any,
+  clusterIndex: number = 0
 ): NationLabelSpine | null {
-  if (!ownedFeatures.length) return null;
+  if (!clusterFeatures.length) return null;
 
-  const territoryKey = ownedFeatures
+  const territoryKey = clusterFeatures
     .map((f) => String(f.stateId))
     .sort()
     .join(',');
-  const cacheKey = `${nation.id}:${territoryKey}:${nation.name}`;
+  const cacheKey = `${nation.id}:${territoryKey}:${nation.name}:${clusterIndex}`;
 
   const cached = labelMetricsCache.get(cacheKey);
   if (cached) return cached;
 
-  const totalArea = ownedFeatures.reduce((sum, f) => sum + f.area, 0);
-
-  // Identify the primary core landmass (largest continuous province cluster)
-  const mainLandmass = getMainLandmassFeatures(ownedFeatures);
-  const mainLandmassArea = mainLandmass.reduce((sum, f) => sum + f.area, 0);
+  const totalArea = clusterFeatures.reduce((sum, f) => sum + f.area, 0);
+  const mainLandmassArea = totalArea;
 
   let minX = Infinity;
   let minY = Infinity;
@@ -493,7 +591,7 @@ export function getNationLabelSpine(
   const samplePoints: PixelPoint[] = [];
   const allMainPolygons: PolygonRings[] = [];
 
-  mainLandmass.forEach((feat) => {
+  clusterFeatures.forEach((feat) => {
     const [tl, br] = feat.bounds;
     if (tl[0] < minX) minX = tl[0];
     if (tl[1] < minY) minY = tl[1];
@@ -510,7 +608,7 @@ export function getNationLabelSpine(
   const height = Math.max(1, maxY - minY);
   const bounds = { minX, minY, maxX, maxY, width, height };
 
-  // Generate an area-based point cloud for accurate PCA (representing mass, not perimeter)
+  // Generate an area-based point cloud for accurate PCA
   const resolution = 30;
   const stepX = Math.max(0.5, bounds.width / resolution);
   const stepY = Math.max(0.5, bounds.height / resolution);
@@ -523,17 +621,20 @@ export function getNationLabelSpine(
     }
   }
 
-  // Fallback to perimeter vertices if the area grid missed (e.g. extremely thin territories)
+  // Fallback to perimeter vertices if the area grid missed
   if (samplePoints.length < 10) {
     allMainPolygons.forEach(poly => {
       poly.exterior.forEach(pt => samplePoints.push(pt));
     });
   }
 
+  const largestFeat = [...clusterFeatures].sort((a, b) => b.area - a.area)[0];
+  const initialCentroid = largestFeat?.centroid || [bounds.minX + bounds.width / 2, bounds.minY + bounds.height / 2];
+
   const { point: center, clearance } = calculatePoleOfInaccessibility(
     allMainPolygons,
     bounds,
-    mainLandmass[0].centroid // Initial guess from the largest province
+    initialCentroid
   );
 
   const {
@@ -547,7 +648,7 @@ export function getNationLabelSpine(
     allMainPolygons,
     samplePoints,
     bounds,
-    mainLandmass[0].centroid || center,
+    initialCentroid || center,
     center,
     clearance
   );
@@ -577,7 +678,7 @@ export function getNationLabelSpine(
 /**
  * Computes dynamic country labels that truly respond to territory geometry:
  * Width expands across territory span, characters bend along curved spines,
- * tracking adapts gracefully, and small states smoothly scale/hide.
+ * and overseas colonies/exclaves possess independent country name labels alongside the homeland.
  */
 export function computeDynamicCountryLabels(
   nations: Nation[],
@@ -613,101 +714,113 @@ export function computeDynamicCountryLabels(
   nations.forEach((nation) => {
     const owned = featuresByNation.get(nation.id);
     if (!owned || !owned.length) return;
-    
-    const spine = getNationLabelSpine(nation, owned, projection);
-    if (!spine) return;
 
-    const { center, clearance, pathD, curveLength, curvature, dominantAngleDeg, totalArea, bounds, mainLandmassArea } = spine;
-    
     const cleanName = (nation.name || '').trim();
     if (!cleanName) return;
 
-    // HOI4 Grand Strategy Map: All-caps uppercase display text
     const displayText = cleanName.toUpperCase();
     const hasCJK = /[\u4e00-\u9fa5\u3040-\u30ff]/.test(displayText);
     const charCount = Math.max(1, displayText.length);
-    const provCount = owned.length;
-
-    // Condensed font character width proportion (Oswald / Barlow Condensed: narrower horizontal ratio)
     const charWidthRatio = hasCJK ? 1.05 : 0.62;
 
-    // Dimension metrics for territory scaling
-    const diagonal = Math.hypot(bounds.width, bounds.height);
-    const minDim = Math.min(bounds.width, bounds.height);
-    const areaRadius = Math.sqrt(mainLandmassArea / Math.PI);
+    // Partition the nation's owned territory into homeland & overseas clusters
+    const clusters = partitionNationClusters(nation, owned);
 
-    // Calculate maximum permitted font height based on regional clearance and corridor width
-    // In multi-province empires, the spine transverses across multiple provinces, allowing grander scale
-    const effectiveCorridor = Math.max(
-      clearance * 1.7,
-      areaRadius * 0.60,
-      minDim * 0.36
-    );
-    const maxFontSizeByHeight = Math.max(1.5, effectiveCorridor * 0.72);
+    clusters.forEach((cluster, clusterIndex) => {
+      const provCount = cluster.features.length;
 
-    // Calculate maximum permitted font width to ensure condensed characters + base spacing fit within the spine length
-    const maxFontSizeByWidth = Math.max(
-      1.4,
-      (curveLength * 0.82) / Math.max(1, charCount * (charWidthRatio + 0.18))
-    );
+      // Calculate cluster bounding diagonal
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      cluster.features.forEach((f) => {
+        const [tl, br] = f.bounds;
+        if (tl[0] < minX) minX = tl[0];
+        if (tl[1] < minY) minY = tl[1];
+        if (br[0] > maxX) maxX = br[0];
+        if (br[1] > maxY) maxY = br[1];
+      });
+      const diag = Math.hypot(maxX - minX, maxY - minY);
 
-    // Dynamic grand strategy sizing strictly driven by territory area, province count, and geographic span:
-    // - Micro-states / 1 province (e.g. city states, small islands): ~1.6 - 2.4 (clean, non-intrusive)
-    // - Mid-sized nations (3-7 provinces): ~3.4 - 5.8
-    // - Major regional powers (8-15 provinces): ~6.5 - 10.5 (prominent, authoritative)
-    // - Superpowers / Vast continental empires (16+ provinces): ~11.0 - 18.0 (grand, refined HOI4 map feel)
-    const areaScale = Math.sqrt(mainLandmassArea) * 0.085;
-    const provinceScale = Math.sqrt(provCount) * 1.65 + (provCount >= 8 ? (provCount - 8) * 0.35 : 0);
-    const spanScale = (curveLength / Math.max(1, charCount * charWidthRatio)) * 0.56;
-    const targetGrandSize = Math.max(1.6 + provinceScale, areaScale, spanScale, diagonal * 0.055);
+      // Label eligibility rule:
+      // 只要领土是飞地（独立聚类）就独立显示国名，不进行过滤
+      if (!cluster.features || cluster.features.length === 0 || cluster.totalArea <= 0) return;
 
-    // Constrain font size within fitting territory geometry
-    let fontSize = Math.min(targetGrandSize, maxFontSizeByHeight, maxFontSizeByWidth);
+      const spine = getNationLabelSpine(nation, cluster.features, projection, clusterIndex);
+      if (!spine) return;
 
-    // Ensure safe bounds (moderately compact scale)
-    fontSize = Math.max(1.5, Math.min(18.0, fontSize));
+      const { center, clearance, pathD, curveLength, curvature, dominantAngleDeg, totalArea, bounds, mainLandmassArea } = spine;
 
-    // Subtle scale-up on zoom to maintain readability
-    fontSize *= (1.0 + Math.log2(Math.max(1, zoom)) * 0.035);
-    fontSize = Math.min(fontSize, 20.0);
+      // Dimension metrics for territory scaling
+      const diagonal = Math.hypot(bounds.width, bounds.height);
+      const minDim = Math.min(bounds.width, bounds.height);
+      const areaRadius = Math.sqrt(mainLandmassArea / Math.PI);
 
-    // Phase 3: Letter spacing calculation for solemn military grand strategy map feel
-    // Moderate, balanced tracking (not overly tight, not absurdly disjointed)
-    const baseTrackingRatio = hasCJK ? 0.22 : 0.28;
-    const baseSpacing = Math.max(0.3, fontSize * baseTrackingRatio);
-    const compactTextWidth = charCount * (fontSize * charWidthRatio) + (charCount - 1) * baseSpacing;
-    const extraSpace = Math.max(0, curveLength * 0.85 - compactTextWidth);
+      // Calculate maximum permitted font height based on regional clearance and corridor width
+      const effectiveCorridor = Math.max(
+        clearance * 1.7,
+        areaRadius * 0.60,
+        minDim * 0.36
+      );
+      const maxFontSizeByHeight = Math.max(1.5, effectiveCorridor * 0.72);
 
-    // Gracefully distribute remaining curve corridor between letters without over-stretching
-    const distributedExtra = charCount > 1 ? extraSpace / (charCount - 1) : 0;
-    const maxTrackingLimit = fontSize * (hasCJK ? 0.45 : 0.60);
-    const letterSpacing = charCount > 1
-      ? Math.min(maxTrackingLimit, baseSpacing + distributedExtra * 0.55)
-      : 0;
+      // Calculate maximum permitted font width to ensure condensed characters + base spacing fit within the spine length
+      const maxFontSizeByWidth = Math.max(
+        1.4,
+        (curveLength * 0.82) / Math.max(1, charCount * (charWidthRatio + 0.18))
+      );
+
+      // Dynamic grand strategy sizing driven by cluster area, province count, and geographic span:
+      const areaScale = Math.sqrt(mainLandmassArea) * 0.085;
+      const provinceScale = Math.sqrt(provCount) * 1.65 + (provCount >= 8 ? (provCount - 8) * 0.35 : 0);
+      const spanScale = (curveLength / Math.max(1, charCount * charWidthRatio)) * 0.56;
+      const targetGrandSize = Math.max(1.6 + provinceScale, areaScale, spanScale, diagonal * 0.055);
+
+      // Constrain font size within fitting territory geometry
+      let fontSize = Math.min(targetGrandSize, maxFontSizeByHeight, maxFontSizeByWidth);
+
+      // Ensure safe bounds
+      fontSize = Math.max(1.5, Math.min(18.0, fontSize));
+
+      // Subtle scale-up on zoom to maintain readability
+      fontSize *= (1.0 + Math.log2(Math.max(1, zoom)) * 0.035);
+      fontSize = Math.min(fontSize, 20.0);
+
+      // Moderate, balanced tracking
+      const baseTrackingRatio = hasCJK ? 0.22 : 0.28;
+      const baseSpacing = Math.max(0.3, fontSize * baseTrackingRatio);
+      const compactTextWidth = charCount * (fontSize * charWidthRatio) + (charCount - 1) * baseSpacing;
+      const extraSpace = Math.max(0, curveLength * 0.85 - compactTextWidth);
+
+      const distributedExtra = charCount > 1 ? extraSpace / (charCount - 1) : 0;
+      const maxTrackingLimit = fontSize * (hasCJK ? 0.45 : 0.60);
+      const letterSpacing = charCount > 1
+        ? Math.min(maxTrackingLimit, baseSpacing + distributedExtra * 0.55)
+        : 0;
+
+      let finalPathD = pathD;
+      const totalLabelSpan = charCount * (fontSize * charWidthRatio) + (charCount - 1) * letterSpacing;
+      if (!finalPathD || curveLength < fontSize) {
+        const halfW = totalLabelSpan / 2;
+        finalPathD = `M ${center[0] - halfW} ${center[1]} L ${center[0] + halfW} ${center[1]}`;
+      }
+
+      const sanitizedId = nation.id.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const pathId = `label-spine-${sanitizedId}-${clusterIndex}`;
       
-    // Phase 4 & 6: Curvature and path
-    // Fallback if path is invalid or zero-length
-    let finalPathD = pathD;
-    const totalLabelSpan = charCount * (fontSize * charWidthRatio) + (charCount - 1) * letterSpacing;
-    if (!finalPathD || curveLength < fontSize) {
-      // Fallback to simple horizontal text
-      const halfW = totalLabelSpan / 2;
-      finalPathD = `M ${center[0] - halfW} ${center[1]} L ${center[0] + halfW} ${center[1]}`;
-    }
-
-    const sanitizedId = nation.id.replace(/[^a-zA-Z0-9_-]/g, '_');
-    
-    labels.push({
-      nation,
-      pathId: `label-spine-${sanitizedId}`,
-      pathD: finalPathD,
-      displayText,
-      center,
-      fontSize,
-      letterSpacing,
-      opacity: 1,
-      curveLength,
-      curvature,
+      labels.push({
+        nation,
+        pathId,
+        pathD: finalPathD,
+        displayText,
+        center,
+        fontSize,
+        letterSpacing,
+        opacity: 1,
+        curveLength,
+        curvature,
+      });
     });
   });
 

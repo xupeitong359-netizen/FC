@@ -130,10 +130,7 @@ nationsRouter.post('/', requireAuth, (req: AuthRequest, res) => {
     if ((!territory || typeof territory !== 'string' || territory.trim().length === 0) && (!provinces || provinces.length === 0)) {
       return res.status(400).json({ error: '请选择或填写国家疆域描述' });
     }
-    const maxAllowedProvinces = user.isLingyuBaby ? 11 : 10;
-    if (provinces && Array.isArray(provinces) && provinces.length > maxAllowedProvinces) {
-      return res.status(400).json({ error: `最多只能选择 ${maxAllowedProvinces} 个省份作为建国初始领土` });
-    }
+    // 无限制：允许圈定任意无限多个省份作为初始领土
 
     // Default coordinates based on some realistic geopolitical areas or random
     const coords: [number, number] = Array.isArray(mapCoordinates) && mapCoordinates.length === 2

@@ -1,15 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
-  Crown,
   User,
   MapPin,
-  Landmark,
-  Compass,
   Edit3,
   Trash2,
   Sparkles,
   Shield,
-  ShieldCheck,
   Award,
   Calendar,
   Lock,
@@ -59,9 +55,12 @@ import {
   Eye,
   Sliders,
   Cpu,
+  Hammer,
+  Boxes,
+  Handshake,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User as UserType, Nation, DiplomacyType } from '../types';
+import { User as UserType, Nation, DiplomacyType, AllianceFaction } from '../types';
 import { TikTokIcon } from './TikTokIcon';
 import {
   DouyinEditProfileModal,
@@ -76,10 +75,12 @@ import {
 } from '../lib/icons';
 import { getTotalCivilianFactories } from '../lib/economyEngine';
 import { getTotalMilitaryFactories } from '../lib/militaryIndustry';
+import { calculateNationResourceOverview } from '../lib/strategicCommandEngine';
 import { workspaceService, WorkspaceItem } from '../services/workspaceService';
 import { getSavedMapTheme, saveMapTheme, MapVisualTheme } from '../lib/mapThemes';
 import { SettingsDebugModal } from './SettingsDebugModal';
 import { useAppSettings } from '../services/settingsService';
+import { EditScenarioModal } from './EditScenarioModal';
 
 interface ProfileViewProps {
   user: UserType | null;
@@ -204,6 +205,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [bioExpanded, setBioExpanded] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
+  // 剧本管理交互状态
+  const [editingScenario, setEditingScenario] = useState<WorkspaceItem | null>(null);
+
   // 昵称与创作者代码：不要让「抖音」成为昵称的一部分
   const rawName = user?.douyinName || user?.username || '领主·战略试玩家9796';
   const displayName = rawName.replace(/_抖音$/, '');
@@ -245,19 +249,31 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     return raw.split('\n').filter((l) => l.trim().length > 0);
   }, [user?.bio]);
 
+  // 国家经济与军事统计
+  const totalCiv = useMemo(() => (myNation ? getTotalCivilianFactories(myNation) : 0), [myNation]);
+  const totalMil = useMemo(() => (myNation ? getTotalMilitaryFactories(myNation) : 0), [myNation]);
+  const nationResources = useMemo(() => calculateNationResourceOverview(myNation), [myNation]);
+  const totalResourcesStockpile = useMemo(() => {
+    return Object.values(nationResources).reduce((acc: number, r: any) => acc + (r?.stockpile || 0), 0);
+  }, [nationResources]);
+  const formattedArmyManpower = useMemo(() => {
+    const manpower = myNation?.army?.manpowerReserve ?? 128000;
+    if (manpower >= 1000000) return `${(manpower / 1000000).toFixed(1)}M`;
+    if (manpower >= 1000) return `${Math.round(manpower / 1000)}K`;
+    return `${manpower}`;
+  }, [myNation]);
+
   // 计算创作者头衔 (Creator Title)
   const creatorTitle = useMemo(() => {
     if (user?.creatorTitle) return user.creatorTitle;
     if (isAdmin) return '官方世界观总架构师';
-    const totalCiv = myNation ? getTotalCivilianFactories(myNation) : 0;
-    const totalMil = myNation ? getTotalMilitaryFactories(myNation) : 0;
     const totalFactories = totalCiv + totalMil;
     if (totalFactories >= 50 || workspaces.length >= 3) return '殿堂级世界观架构师';
     if (myNation && (myNation.completedFocuses || []).length >= 5) return '大战略沙盘策划总编';
     if (myNation) return '地缘文明奠基者';
     if (user?.isCreator) return '认证沙盘架构师';
     return '新星地缘造物者';
-  }, [user, myNation, isAdmin, workspaces.length]);
+  }, [user, myNation, isAdmin, workspaces.length, totalCiv, totalMil]);
 
   // 计算加入/参创天数
   const daysSinceJoin = useMemo(() => {
@@ -721,6 +737,127 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
           </div>
         </div>
+      </section>
+
+      {/* 剧本列表 */}
+      <section aria-label="剧本" className="pt-2 space-y-3">
+        {/* Section Header: 只保留剧本与数量，去除冗余描述文字 */}
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-1.5">
+            <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+              剧本
+            </h3>
+            <span className="text-xs font-semibold text-slate-500 font-mono">
+              ({workspaces.length})
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              const newWs: WorkspaceItem = {
+                id: `ws_custom_${Date.now()}`,
+                name: '新创大战略沙盘推演剧本',
+                era: '1936.01.01',
+                visibility: 'public',
+                creatorId: user?.id || 'creator_guest',
+                creatorName: displayName,
+                description: '自定义地缘阵营演进与历史走向推演',
+                scenarioType: '拟实',
+                scenarioName: '新创大战略沙盘推演剧本',
+                scenarioEra: '1936.01.01',
+                scenarioDesc: '自定义地缘阵营演进与历史走向推演',
+                rulesConfig: {
+                  maxAllies: 3,
+                  initialTension: 35,
+                  victoryCondition: 'domination',
+                },
+                coreFactions: nations.slice(0, 5).map((n) => n.name),
+                initialTension: 35,
+                likesCount: 0,
+                likedUserIds: [],
+                comments: [],
+                createdAt: new Date().toISOString(),
+              };
+              setEditingScenario(newWs);
+            }}
+            className="px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>新建剧本</span>
+          </button>
+        </div>
+
+        {/* 剧本列表展示 */}
+        {workspaces.length === 0 ? (
+          <div className="p-6 rounded-2xl bg-white border border-slate-200 text-center space-y-2">
+            <Scroll className="w-8 h-8 text-slate-300 mx-auto" />
+            <p className="text-xs font-bold text-slate-700">尚未创建剧本</p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {workspaces.map((ws) => (
+              <div
+                key={ws.id}
+                className="p-3.5 rounded-2xl bg-white border border-slate-200/90 hover:border-slate-300 transition-all shadow-2xs space-y-2.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-bold text-slate-900 truncate">
+                        {ws.scenarioName || ws.name}
+                      </span>
+                      <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        {ws.scenarioEra || ws.era || '1936.01.01'}
+                      </span>
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                        {ws.scenarioType || '拟实'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                      {ws.scenarioDesc || ws.description || '自定义沙盘推演世界观与阵营对决'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Factions & Tension Preview */}
+                <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+                  <span className="flex items-center gap-1 font-mono">
+                    <Flame className="w-3 h-3 text-rose-500" />
+                    <span>全球紧张度：{ws.initialTension ?? ws.rulesConfig?.initialTension ?? 35}%</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    同盟上限：{ws.rulesConfig?.maxAllies ?? 3}国
+                  </span>
+                </div>
+
+                {/* Scenario Action Buttons */}
+                <div className="flex items-center gap-2 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      workspaceService.setActiveWorkspaceId(ws.id);
+                      if (onOpenWorkspace) onOpenWorkspace();
+                    }}
+                    className="flex-1 py-1.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                  >
+                    <FolderGit2 className="w-3.5 h-3.5" />
+                    <span>继续编辑剧本</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditingScenario(ws)}
+                    className="py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200 transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>设定参数</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* 2.4 系统设置入口 (前卫极简设计) */}
@@ -1194,6 +1331,21 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         onClose={() => setIsSettingsModalOpen(false)}
         showToast={showToast}
       />
+
+      {/* 编辑/新建推演剧本弹窗 */}
+      {editingScenario && (
+        <EditScenarioModal
+          isOpen={!!editingScenario}
+          onClose={() => setEditingScenario(null)}
+          scenario={editingScenario}
+          nations={nations}
+          onScenarioUpdated={(updated) => {
+            setWorkspaces(workspaceService.getWorkspaces());
+          }}
+          onOpenWorkspaceEditor={onOpenWorkspace}
+          showToast={showToast}
+        />
+      )}
     </div>
   );
 };

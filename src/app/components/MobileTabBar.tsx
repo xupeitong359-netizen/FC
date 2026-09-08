@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -15,7 +15,51 @@ export const MobileTabBar: React.FC<MobileTabBarProps> = ({
   onOpenWorkspace,
 }) => {
   const { user } = useAuth();
-  const [unreadMessagesCount] = useState(1);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('fc_messages_store_v2');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.reduce((acc: number, m: any) => {
+            if (m.unreadCount) return acc + m.unreadCount;
+            if (m.hasRedDot) return acc + 1;
+            return acc;
+          }, 0);
+        }
+      }
+    } catch {
+      // fallback
+    }
+    return 5;
+  });
+
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const saved = localStorage.getItem('fc_messages_store_v2');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            const count = parsed.reduce((acc: number, m: any) => {
+              if (m.unreadCount) return acc + m.unreadCount;
+              if (m.hasRedDot) return acc + 1;
+              return acc;
+            }, 0);
+            setUnreadMessagesCount(count);
+          }
+        }
+      } catch {
+        // fallback
+      }
+    };
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('focus', handleSync);
+    return () => {
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('focus', handleSync);
+    };
+  }, []);
 
   // 判定是否具备创作者特权
   const isCreator = Boolean(

@@ -53,6 +53,7 @@ import {
   workspaceService,
   WorkspaceItem,
   WorkspaceRulesConfig,
+  MAX_CREATOR_WORKSPACES,
 } from '../services/workspaceService';
 
 interface WorkspaceCreationWizardProps {
@@ -175,11 +176,18 @@ export const WorkspaceCreationWizard: React.FC<WorkspaceCreationWizardProps> = (
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // 创作者配额检查（单个创作者最多3个剧本，超出需删除已有剧本）
+  const quota = workspaceService.canCreateWorkspace(user?.id);
+
   if (!isOpen) return null;
 
   const handleNextStep = () => {
     if (!isCreator) {
       setErrorMsg('仅已注册的创作者可构筑推演沙盘，请先注册/认证创作者账户');
+      return;
+    }
+    if (!quota.allowed) {
+      setErrorMsg(`单个创作者最多创建 ${MAX_CREATOR_WORKSPACES} 个剧本。您当前已达上限（${quota.currentCount}/${MAX_CREATOR_WORKSPACES}），继续创建需要先删除已有的自建剧本。`);
       return;
     }
     if (currentStep === 1) {
@@ -204,6 +212,10 @@ export const WorkspaceCreationWizard: React.FC<WorkspaceCreationWizardProps> = (
     e.preventDefault();
     if (!isCreator) {
       setErrorMsg('仅已注册的创作者可构筑推演沙盘，请先注册/认证创作者账户');
+      return;
+    }
+    if (!quota.allowed) {
+      setErrorMsg(`单个创作者最多创建 ${MAX_CREATOR_WORKSPACES} 个剧本。您当前已达上限（${quota.currentCount}/${MAX_CREATOR_WORKSPACES}），继续创建需要先删除已有的自建剧本。`);
       return;
     }
     if (!name.trim()) {
@@ -396,6 +408,23 @@ export const WorkspaceCreationWizard: React.FC<WorkspaceCreationWizardProps> = (
         ) : (
           /* Content Body */
           <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 space-y-4">
+            {/* 创作者剧本名额配额指示条 */}
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-100/90 border border-slate-200/80 text-xs">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-indigo-600 shrink-0" />
+                <span className="text-slate-700 font-medium">自建剧本配额：</span>
+                <span className={`font-mono font-bold ${quota.currentCount >= MAX_CREATOR_WORKSPACES ? 'text-amber-600' : 'text-indigo-600'}`}>
+                  {quota.currentCount} / {MAX_CREATOR_WORKSPACES}
+                </span>
+                <span className="text-[11px] text-slate-400">（单人最多 3 个）</span>
+              </div>
+              {!quota.allowed && (
+                <span className="text-[11px] text-rose-600 font-medium bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200/60">
+                  配额已满，继续创建需删除已有剧本
+                </span>
+              )}
+            </div>
+
           {errorMsg && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -988,11 +1017,17 @@ export const WorkspaceCreationWizard: React.FC<WorkspaceCreationWizardProps> = (
                 <button
                   type="button"
                   onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white text-xs font-bold transition shadow-sm cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                  disabled={isSubmitting || !quota.allowed}
+                  className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white text-xs font-bold transition shadow-sm cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{isSubmitting ? '正在创世发布...' : '立即发布推演工作区'}</span>
+                  <span>
+                    {isSubmitting
+                      ? '正在创世发布...'
+                      : !quota.allowed
+                      ? '已达3个剧本上限（需先删除已有剧本）'
+                      : '立即发布推演工作区'}
+                  </span>
                 </button>
               )}
             </div>

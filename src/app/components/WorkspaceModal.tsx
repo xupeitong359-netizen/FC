@@ -1,60 +1,63 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
-  ArrowRight,
-  MoreVertical,
-  Bell,
-  Info,
-  Layers,
-  BookOpen,
-  Zap,
-  Flag,
-  Shield,
-  Heart,
-  MessageSquare,
-  Sparkles,
-  Share2,
-  RefreshCw,
-  FolderGit2,
   Plus,
-  Check,
+  Trash2,
+  Search,
   Globe2,
-  Lock,
-  ChevronRight,
-  X,
-  Send,
-  Calendar,
-  SlidersHorizontal,
-  Compass,
-  User,
-  CornerDownRight,
-  Flame,
+  Flag,
+  RotateCcw,
+  Download,
   Maximize2,
   Minimize2,
+  Sparkles,
+  AlertTriangle,
+  CheckCircle2,
+  BoxSelect,
+  MousePointer,
   Landmark,
-  Crown,
-  Castle,
-  Anchor,
-  Target,
-  Feather,
-  Swords,
+  Layers,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Menu,
+  X,
+  Check,
+  ZoomIn,
+  ZoomOut,
+  MapPin,
+  Compass,
+  SlidersHorizontal,
+  MoreHorizontal,
+  MoreVertical,
+  Pencil,
+  Settings,
+  Users,
+  Shield,
+  TrendingUp,
+  Building2,
+  Crosshair,
+  ExternalLink,
+  Activity,
+  ArrowRight,
+  Trophy,
+  Award,
 } from 'lucide-react';
 import {
   workspaceService,
   WorkspaceItem,
-  WorkspaceComment,
+  MAX_CREATOR_WORKSPACES,
 } from '../services/workspaceService';
-import { useAuth } from '../context/AuthContext';
-import { Nation } from '../types';
-import { api } from '../services/api';
+import { Nation, ProvinceData, RegimeType, IdeologyType } from '../types';
 import { WorldMap } from './WorldMap';
-import { WorkspaceScenariosTab } from './WorkspaceScenariosTab';
-import { WorkspaceEventsTab } from './WorkspaceEventsTab';
-import { WorkspaceNationsTab } from './WorkspaceNationsTab';
-import { WorkspaceRulesTab } from './WorkspaceRulesTab';
 import { WorkspaceCreationWizard } from './WorkspaceCreationWizard';
-import { WorkspaceTimelineTab } from './WorkspaceTimelineTab';
+import { getProvinceChineseName } from '../lib/provinceTranslations';
+import { NationFlagDisplay, getAspectRatioCSS } from './NationFlagDisplay';
+import { QuickNationCreateModal } from './QuickNationCreateModal';
+import { EditNationDataModal } from './EditNationDataModal';
+import { TerritoryColorPicker } from './TerritoryColorPicker';
+import { exportRankingToPng } from '../utils/exportImage';
 
 interface WorkspaceModalProps {
   isOpen: boolean;
@@ -65,1924 +68,2284 @@ interface WorkspaceModalProps {
   nations?: Nation[];
   myNation?: Nation | null;
   onSelectNation?: (nation: Nation) => void;
-  onOpenDiplomacy?: (nation: Nation) => void;
 }
 
-type WorkspaceNavTab = 'overview' | 'map' | 'scenarios' | 'events' | 'nations' | 'rules';
+// 默认的初始虚拟国家集
+const DEFAULT_WORKSPACE_NATIONS: Nation[] = [
+  {
+    id: 'nation_china',
+    ownerId: 'creator_workspace',
+    ownerUsername: '沙盘统帅',
+    ownerDouyinName: '虚拟国家',
+    name: '中国',
+    shortName: 'CHN',
+    flagUrl: 'flag_cn',
+    flagColor: '#dc2626',
+    nationType: '民主共和国',
+    capital: '待勘定',
+    territory: '0 个省份',
+    description: '历史悠久的大陆文明国家，具备深厚的人口与战略纵深。',
+    regime: '民主议会制',
+    ideology: '自由民主主义',
+    language: '华夏通用语',
+    currency: '法币',
+    emblemIcon: 'flag',
+    createdAt: '1936-01-01T00:00:00.000Z',
+    updatedAt: '1936-01-01T00:00:00.000Z',
+    provinces: [],
+    totalPopulation: 0,
+  },
+  {
+    id: 'nation_britain',
+    ownerId: 'creator_workspace',
+    ownerUsername: '沙盘统帅',
+    ownerDouyinName: '虚拟国家',
+    name: '英国',
+    shortName: 'GBR',
+    flagUrl: 'flag_gb',
+    flagColor: '#1d4ed8',
+    nationType: '君主立宪国',
+    capital: '待勘定',
+    territory: '0 个省份',
+    description: '传统海洋帝国，拥有成熟的工业体系与全球航运航道。',
+    regime: '君主立宪制',
+    ideology: '自由民主主义',
+    language: '英语',
+    currency: '英镑',
+    emblemIcon: 'crown',
+    createdAt: '1936-01-01T00:00:00.000Z',
+    updatedAt: '1936-01-01T00:00:00.000Z',
+    provinces: [],
+    totalPopulation: 0,
+  },
+  {
+    id: 'nation_france',
+    ownerId: 'creator_workspace',
+    ownerUsername: '沙盘统帅',
+    ownerDouyinName: '虚拟国家',
+    name: '法国',
+    shortName: 'FRA',
+    flagUrl: 'flag_fr',
+    flagColor: '#2563eb',
+    nationType: '民主共和国',
+    capital: '待勘定',
+    territory: '0 个省份',
+    description: '西欧大陆强权，平原富饶，拥有高度集约的工业基础。',
+    regime: '民主议会制',
+    ideology: '自由民主主义',
+    language: '法语',
+    currency: '法郎',
+    emblemIcon: 'shield',
+    createdAt: '1936-01-01T00:00:00.000Z',
+    updatedAt: '1936-01-01T00:00:00.000Z',
+    provinces: [],
+    totalPopulation: 0,
+  },
+];
 
-const getWorkspaceTotemIcon = (id?: string) => {
-  switch (id) {
-    case 'shield': return Shield;
-    case 'crown': return Crown;
-    case 'compass': return Compass;
-    case 'flag': return Flag;
-    case 'globe': return Globe2;
-    case 'anchor': return Anchor;
-    case 'flame': return Flame;
-    case 'zap': return Zap;
-    case 'target': return Target;
-    case 'feather': return Feather;
-    case 'castle': return Castle;
-    case 'swords': return Swords;
-    default: return Landmark;
+// 人口量级格式化
+const formatPopulation = (pop: number): string => {
+  if (pop >= 100000000) {
+    return `${(pop / 100000000).toFixed(2)} 亿`;
   }
+  if (pop >= 10000) {
+    return `${(pop / 10000).toFixed(1)} 万`;
+  }
+  return `${pop.toLocaleString()} 人`;
 };
 
-const PRESET_ERAS = [
-  '1936年',
-  '1939年',
-  '1942—1945年',
-  '冷战时期',
-  '21世纪初',
-  '近未来',
-  '架空纪元',
-];
+// 计算国家总人口
+const calculateNationTotalPop = (nation: Nation): number => {
+  if (!nation.provinces || nation.provinces.length === 0) return 0;
+  return nation.provinces.reduce((sum, p) => {
+    const pop = p.population || p.manpower || (1200000 + (Math.abs(Number(p.id || 1) * 3821) % 4500000));
+    return sum + pop;
+  }, 0);
+};
+
+// 计算国家总国土面积 (km²)
+const calculateNationTotalArea = (nation: Nation): number => {
+  if (!nation.provinces || nation.provinces.length === 0) return 0;
+  return nation.provinces.reduce((sum, p) => {
+    const area = (p as any).area_km2 || (p as any).area || Math.round(22000 + Math.abs(Number(p.id || 1) * 317) % 55000);
+    return sum + area;
+  }, 0);
+};
+
+// 获取国家规范英文名称或副代号
+const getNationEnglishName = (nation: Nation): string => {
+  if (nation.shortName && nation.shortName !== nation.name && /^[a-zA-Z\s]+$/.test(nation.shortName)) {
+    return nation.shortName;
+  }
+  const dict: Record<string, string> = {
+    '英国': 'United Kingdom',
+    '法国': 'France',
+    '德国': 'Germany',
+    '第二帝国': 'Second Reich',
+    '苏联': 'Soviet Union',
+    '日本': 'Japan',
+    '美国': 'United States',
+    '中国': 'China',
+    '意大利': 'Italy',
+    '西班牙': 'Spain',
+    '波兰': 'Poland',
+  };
+  return dict[nation.name] || nation.shortName || nation.nationType || 'Sovereign Nation';
+};
 
 export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
   isOpen,
   onClose,
   onOpenAuth,
   onWorkspaceSelected,
-  variant = 'page',
-  nations: initialNations,
-  myNation,
-  onSelectNation,
-  onOpenDiplomacy,
+  variant = 'modal',
 }) => {
-  const { user, isAuthenticated, isAdmin } = useAuth();
-  const [internalNations, setInternalNations] = useState<Nation[]>([]);
-  const [workspaces, setWorkspaces] = useState<WorkspaceItem[]>(() =>
-    workspaceService.getWorkspaces()
-  );
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>(() =>
-    workspaceService.getActiveWorkspaceId()
-  );
+  // 当前工作区与剧本状态
+  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceItem | null>(null);
+  const [workspacesList, setWorkspacesList] = useState<WorkspaceItem[]>([]);
+  const [showScenarioSwitchModal, setShowScenarioSwitchModal] = useState(false);
+  const [showCreationWizard, setShowCreationWizard] = useState(false);
 
+  // 工作区模式：'create'（新建国家模式） | 'territory'（分配疆域模式）
+  const [activeMode, setActiveMode] = useState<'create' | 'territory'>('territory');
+
+  // 虚拟国家列表
+  const [workspaceNations, setWorkspaceNations] = useState<Nation[]>([]);
+  // 当前正在分配疆域或选中的国家 ID
+  const [selectedNationId, setSelectedNationId] = useState<string | null>(null);
+  // 搜索关键字（桌面端）
+  const [searchKeyword, setSearchKeyword] = useState('');
+
+  // 移动端国家侧栏抽屉开关
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // 快速建国弹窗控制（核心需求）
+  const [isQuickNationModalOpen, setIsQuickNationModalOpen] = useState(false);
+
+  // 🌟 侧滑抽屉状态（按需唤出，默认全部隐藏，确保地图绝对主角）
+  const [isNationListOpen, setIsNationListOpen] = useState(false); // 左侧国家列表卡片展开状态
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false); // 国家列表内搜索展开状态
+  const nationCardRef = useRef<HTMLDivElement | null>(null);
+
+  // 展开国家列表卡片时，点击外部自动收起
   useEffect(() => {
-    if (!initialNations || initialNations.length === 0) {
-      api.nations.list().then((data) => {
-        if (data && data.nations) setInternalNations(data.nations);
-      }).catch(() => {});
-    }
-  }, [initialNations]);
+    if (!isNationListOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (nationCardRef.current && !nationCardRef.current.contains(e.target as Node)) {
+        setIsNationListOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', handleClickOutside);
+    return () => {
+      document.removeEventListener('pointerdown', handleClickOutside);
+    };
+  }, [isNationListOpen]);
 
-  const activeNations = (initialNations && initialNations.length > 0) ? initialNations : internalNations;
+  const [isNationDetailOpen, setIsNationDetailOpen] = useState(false); // 右侧国家详情抽屉
+  const [detailNationId, setDetailNationId] = useState<string | null>(null); // 当前详情查看的国家 ID
+  const [detailTab, setDetailTab] = useState<'overview' | 'economy' | 'military' | 'diplomacy'>('overview');
 
-  // Active top-level subtab: 概览 | 地图 | 剧本 | 事件 | 国家 | 规则
-  const [activeNavTab, setActiveNavTab] = useState<WorkspaceNavTab>('overview');
+  // 🌟 国家排行弹窗状态与排序维度
+  const [isRankingModalOpen, setIsRankingModalOpen] = useState(false);
+  const [rankingSortField, setRankingSortField] = useState<'power' | 'provinces' | 'population' | 'industry'>('power');
+  const [isExportingRanking, setIsExportingRanking] = useState(false);
+  const [isExportingMap, setIsExportingMap] = useState(false);
 
-  // Secondary Drawer states: 'info' | 'comments' | 'create' | 'edit' | null
-  const [activeDrawer, setActiveDrawer] = useState<'info' | 'comments' | 'create' | 'edit' | null>(
-    null
-  );
+  // 🌟 右上角地图工具箱收起与展开（默认收起为小按钮）
+  const [isMapToolsExpanded, setIsMapToolsExpanded] = useState(false);
 
-  // Step-by-step Creation Wizard state
-  const [isCreationWizardOpen, setIsCreationWizardOpen] = useState(false);
-
-  // More menu dropdown
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
-  const moreMenuRef = useRef<HTMLDivElement>(null);
-
-  // Creator privilege
-  const isCreator = Boolean(
-    user?.isCreator ||
-      user?.isLingyuBaby ||
-      user?.role === 'admin' ||
-      Boolean(localStorage.getItem('creator_profile_auth'))
-  );
-
-  // New Workspace form state
-  const [newName, setNewName] = useState('粉陆纪元·开天辟地');
-  const [newEra, setNewEra] = useState('1936年');
-  const [newCustomEra, setNewCustomEra] = useState('');
-  const [newScenarioType, setNewScenarioType] = useState<'拟实' | '架空'>('架空');
-  const [newVisibility, setNewVisibility] = useState<'public' | 'private'>('public');
-  const [newDescription, setNewDescription] = useState(
-    '粉陆大陆秩序初定，万邦立宪自决，重构全球文明版图与政治格局。'
-  );
-
-  // Comment input state
-  const [commentText, setCommentText] = useState('');
-  const [guestName, setGuestName] = useState('');
-  const [commentError, setCommentError] = useState<string | null>(null);
-  const [likedCommentIds, setLikedCommentIds] = useState<Record<string, boolean>>({});
-  const [commentExtraLikes, setCommentExtraLikes] = useState<Record<string, number>>({});
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const handleToggleCommentLike = (commentId: string) => {
-    setLikedCommentIds((prev) => {
-      const isLiked = !!prev[commentId];
-      setCommentExtraLikes((likes) => ({
-        ...likes,
-        [commentId]: (likes[commentId] || 0) + (isLiked ? -1 : 1),
-      }));
-      return { ...prev, [commentId]: !isLiked };
-    });
-  };
-
-  const handleReplyToComment = (authorName: string) => {
-    setCommentText((prev) => {
-      const prefix = `@${authorName} `;
-      if (prev.startsWith(prefix)) return prev;
-      return prefix + prev;
-    });
-    setTimeout(() => {
-      textareaRef.current?.focus();
-    }, 50);
-  };
-
-  const handleInsertTopicTag = (tag: string) => {
-    setCommentText((prev) => {
-      if (prev.includes(tag)) return prev;
-      return `${tag} ${prev}`.trim();
-    });
-    setTimeout(() => {
-      textareaRef.current?.focus();
-    }, 50);
-  };
-
-  const formatCommentTime = (dateStr: string) => {
-    try {
-      const date = new Date(dateStr);
-      const now = new Date();
-      const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
-      if (diffSec < 60) return '刚刚';
-      if (diffSec < 3600) return `${Math.floor(diffSec / 60)}分钟前`;
-      if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}小时前`;
-      return date.toLocaleDateString([], {
-        month: 'numeric',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return dateStr;
-    }
-  };
-
-  // Edit workspace state
-  const [editingWorkspace, setEditingWorkspace] = useState<WorkspaceItem | null>(null);
-
-  // Fullscreen Map State and Auto-Fullscreen Preference
-  const [isFullscreenMap, setIsFullscreenMap] = useState(false);
-  const [autoFullscreenMap, setAutoFullscreenMap] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('ws_auto_fullscreen_map') === 'true';
-    } catch {
-      return false;
-    }
+  // 🌟 地图图层弹窗
+  const [isLayerModalOpen, setIsLayerModalOpen] = useState(false);
+  const [mapMode, setMapMode] = useState<'political' | 'terrain' | 'population' | 'industrial' | 'resources'>('political');
+  const [layerSettings, setLayerSettings] = useState({
+    showCountryName: true,
+    showProvinceName: true,
+    showGrid: false,
+    showLegend: true,
   });
 
-  useEffect(() => {
-    const handleFsChange = () => {
-      setIsFullscreenMap(Boolean(document.fullscreenElement));
-    };
-    document.addEventListener('fullscreenchange', handleFsChange);
-    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  // 🌟 完整国家档案编辑大弹窗
+  const [isEditFullDataOpen, setIsEditFullDataOpen] = useState(false);
+  const [editingNationForFullData, setEditingNationForFullData] = useState<Nation | null>(null);
+
+  // 快捷重命名与三点操作菜单
+  const [activeNationMenuId, setActiveNationMenuId] = useState<string | null>(null);
+  const [isRenamingNation, setIsRenamingNation] = useState(false);
+  const [renameNationInput, setRenameNationInput] = useState('');
+
+  // 更多操作下拉菜单
+  const [showMoreActions, setShowMoreActions] = useState(false);
+
+  // 框选模式开关（核心需求：可以框选，取消仅相邻限制）
+  const [isBoxSelectMode, setIsBoxSelectMode] = useState(false);
+
+  // 定都模式开关（点击地图省份直接设为当前选中国家的法定都城）
+  const [isSetCapitalMode, setIsSetCapitalMode] = useState(false);
+
+  // 通用确认对话框
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    isDangerous?: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: '确认',
+    onConfirm: () => {},
+  });
+
+  // 轻量级 Toast 提示
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToastMessage(msg);
+    toastTimeoutRef.current = setTimeout(() => setToastMessage(null), 3200);
   }, []);
 
-  const handleOpenCreationWizard = () => {
-    if (!isCreator) {
-      window.dispatchEvent(
-        new CustomEvent('app-toast', {
-          detail: {
-            message: '仅已注册的创作者可构筑推演沙盘，请先注册/认证创作者账户',
-          },
-        })
+  // 全屏状态
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // 初始化加载工作区与国家数据
+  useEffect(() => {
+    const currentActive = workspaceService.getActiveWorkspace();
+    const allWs = workspaceService.getWorkspaces();
+    setWorkspacesList(allWs);
+
+    if (currentActive) {
+      setActiveWorkspace(currentActive);
+      if (currentActive.customNations && currentActive.customNations.length > 0) {
+        setWorkspaceNations(currentActive.customNations);
+        setSelectedNationId(currentActive.customNations[0].id);
+      } else {
+        setWorkspaceNations(DEFAULT_WORKSPACE_NATIONS);
+        setSelectedNationId(DEFAULT_WORKSPACE_NATIONS[0].id);
+        workspaceService.updateWorkspace(currentActive.id, {
+          customNations: DEFAULT_WORKSPACE_NATIONS,
+        });
+      }
+    } else if (allWs.length > 0) {
+      const first = allWs[0];
+      workspaceService.setActiveWorkspaceId(first.id);
+      setActiveWorkspace(first);
+      const nations = first.customNations && first.customNations.length > 0
+        ? first.customNations
+        : DEFAULT_WORKSPACE_NATIONS;
+      setWorkspaceNations(nations);
+      setSelectedNationId(nations.length > 0 ? nations[0].id : null);
+    }
+  }, []);
+
+  // 当前选中的国家对象
+  const selectedNation = useMemo(() => {
+    if (!selectedNationId) return null;
+    return workspaceNations.find((n) => n.id === selectedNationId) || null;
+  }, [selectedNationId, workspaceNations]);
+
+  // 正在查看详情的国家对象（如果没指定 detailNationId，则使用当前选中国家）
+  const viewingNation = useMemo(() => {
+    if (detailNationId) {
+      return workspaceNations.find((n) => n.id === detailNationId) || selectedNation;
+    }
+    return selectedNation;
+  }, [detailNationId, selectedNation, workspaceNations]);
+  const detailNation = viewingNation;
+
+  // 全局统计数据
+  const globalStats = useMemo(() => {
+    let totalAssignedProvinces = 0;
+    let totalGlobalPop = 0;
+    workspaceNations.forEach((n) => {
+      totalAssignedProvinces += n.provinces?.length || 0;
+      totalGlobalPop += calculateNationTotalPop(n);
+    });
+    return {
+      totalNations: workspaceNations.length,
+      totalAssignedProvinces,
+      totalGlobalPop,
+    };
+  }, [workspaceNations]);
+
+  // 搜索过滤国家列表
+  const filteredNations = useMemo(() => {
+    if (!searchKeyword.trim()) return workspaceNations;
+    const kw = searchKeyword.toLowerCase();
+    return workspaceNations.filter(
+      (n) =>
+        n.name.toLowerCase().includes(kw) ||
+        (n.shortName && n.shortName.toLowerCase().includes(kw)) ||
+        (n.nationType && n.nationType.toLowerCase().includes(kw))
+    );
+  }, [workspaceNations, searchKeyword]);
+
+  // 🌟 计算国家综合排行数据（综合国力、领土省份、总人口、工业产能）
+  const rankingList = useMemo(() => {
+    const list = workspaceNations.map((nation) => {
+      const provinceCount = nation.provinces?.length || 0;
+      const totalPop = calculateNationTotalPop(nation);
+      const totalArea = calculateNationTotalArea(nation);
+      let civFactories = 0;
+      let milFactories = 0;
+      (nation.provinces || []).forEach((p) => {
+        civFactories += p.civilianFactories || 0;
+        milFactories += p.militaryFactories || 0;
+      });
+      const totalFactories = civFactories + milFactories;
+      const divisionsCount = nation.army?.divisions?.length || 0;
+
+      // 综合国力评分：综合考量省份领土、总人口规模、工业基底（民工+军工）、常备军力
+      const powerScore = Math.round(
+        provinceCount * 25 +
+        (totalPop / 1000000) * 1.5 +
+        civFactories * 32 +
+        milFactories * 48 +
+        divisionsCount * 24 +
+        (nation.stabilityIndex || 70) * 2
       );
-      onOpenAuth('register');
+
+      return {
+        nation,
+        provinceCount,
+        totalPop,
+        totalArea,
+        civFactories,
+        milFactories,
+        totalFactories,
+        divisionsCount,
+        powerScore,
+      };
+    });
+
+    return list.sort((a, b) => {
+      if (rankingSortField === 'power') return b.powerScore - a.powerScore;
+      if (rankingSortField === 'provinces') {
+        if (b.provinceCount !== a.provinceCount) return b.provinceCount - a.provinceCount;
+        return b.totalArea - a.totalArea;
+      }
+      if (rankingSortField === 'population') return b.totalPop - a.totalPop;
+      if (rankingSortField === 'industry') return b.totalFactories - a.totalFactories;
+      return 0;
+    });
+  }, [workspaceNations, rankingSortField]);
+
+  // 🌟 下载当前视角下的无UI纯净世界地图 .png
+  const handleDownloadPureMapPng = useCallback(() => {
+    setIsExportingMap(true);
+    showToast('正在生成当前视角下的无UI纯净世界地图...');
+    window.dispatchEvent(
+      new CustomEvent('map-download-current-view', {
+        detail: {
+          fileName: `纯净世界地图_${activeWorkspace?.name || '沙盘推演'}_${new Date().toISOString().slice(0, 10)}.png`,
+        },
+      })
+    );
+  }, [activeWorkspace?.name, showToast]);
+
+  useEffect(() => {
+    const handleDownloadFinished = (e: any) => {
+      setIsExportingMap(false);
+      showToast('当前视角下的无UI纯净世界地图已成功下载为 PNG');
+    };
+    window.addEventListener('map-download-finished', handleDownloadFinished);
+    return () => {
+      window.removeEventListener('map-download-finished', handleDownloadFinished);
+    };
+  }, [showToast]);
+
+  // 🌟 下载国家排行长图 .png
+  const handleDownloadRankingPng = useCallback(async () => {
+    try {
+      setIsExportingRanking(true);
+      showToast('正在生成国家实力排行长图 (.png)...');
+      const dimTitleMap: Record<string, string> = {
+        power: '综合国力排行榜',
+        provinces: '领土省份排行榜',
+        population: '总人口排行榜',
+        industry: '工业产能排行榜',
+      };
+
+      const topScore = rankingList[0]?.powerScore || 1;
+      const topProvs = rankingList[0]?.provinceCount || 1;
+      const topPop = rankingList[0]?.totalPop || 1;
+      const topFact = rankingList[0]?.totalFactories || 1;
+
+      const items = rankingList.map((item, idx) => {
+        let primaryVal = '';
+        if (rankingSortField === 'power') primaryVal = `${item.powerScore.toLocaleString()} 分`;
+        else if (rankingSortField === 'provinces') primaryVal = `${item.provinceCount} 省`;
+        else if (rankingSortField === 'population') primaryVal = formatPopulation(item.totalPop);
+        else if (rankingSortField === 'industry') primaryVal = `${item.totalFactories} 厂`;
+
+        const sub =
+          rankingSortField === 'power'
+            ? `${item.provinceCount}省 · 人口${formatPopulation(item.totalPop)} · ${item.totalFactories}厂`
+            : rankingSortField === 'provinces'
+            ? `面积约 ${(item.totalArea / 10000).toFixed(1)}万 km²`
+            : rankingSortField === 'population'
+            ? `占世界 ${globalStats.totalGlobalPop > 0 ? ((item.totalPop / globalStats.totalGlobalPop) * 100).toFixed(1) : 0}%`
+            : `民用 ${item.civFactories} · 军工 ${item.milFactories}`;
+
+        let pct = 100;
+        if (rankingSortField === 'power') pct = Math.round((item.powerScore / Math.max(1, topScore)) * 100);
+        else if (rankingSortField === 'provinces') pct = Math.round((item.provinceCount / Math.max(1, topProvs)) * 100);
+        else if (rankingSortField === 'population') pct = Math.round((item.totalPop / Math.max(1, topPop)) * 100);
+        else if (rankingSortField === 'industry') pct = Math.round((item.totalFactories / Math.max(1, topFact)) * 100);
+
+        return {
+          rank: idx + 1,
+          name: item.nation.name,
+          regime: item.nation.regime || item.nation.nationType || '主权国家',
+          flagColor: item.nation.flagColor || '#3B82F6',
+          primaryValueText: primaryVal,
+          subText: sub,
+          percentage: pct,
+        };
+      });
+
+      const fileName = await exportRankingToPng({
+        scenarioName: activeWorkspace?.name || '全球推演沙盘',
+        dimensionTitle: dimTitleMap[rankingSortField] || '国家排行榜',
+        items,
+        totalNations: workspaceNations.length,
+        totalProvinces: workspaceNations.reduce((acc, n) => acc + (n.provinces?.length || 0), 0),
+        totalPopulationText: formatPopulation(globalStats.totalGlobalPop),
+      });
+      showToast(`已成功下载【${fileName}】`);
+    } catch (err) {
+      console.error('Export ranking error:', err);
+      showToast('下载国家排行长图失败，请重试');
+    } finally {
+      setIsExportingRanking(false);
+    }
+  }, [
+    rankingList,
+    rankingSortField,
+    activeWorkspace?.name,
+    workspaceNations,
+    globalStats.totalGlobalPop,
+    showToast,
+  ]);
+
+  // 持久化国家数据至工作区
+  const persistNationsUpdate = useCallback((updatedNations: Nation[]) => {
+    setWorkspaceNations(updatedNations);
+    if (activeWorkspace) {
+      workspaceService.updateWorkspace(activeWorkspace.id, {
+        customNations: updatedNations,
+      });
+    }
+  }, [activeWorkspace]);
+
+  // 地图上单点点击省份进行划拨或移出（彻底取消相邻限制）
+  const handleMapProvinceClick = useCallback((provinceInfo: {
+    id: string | number;
+    name: string;
+    properties: any;
+    ownerNation?: Nation | null;
+  }) => {
+    if (!selectedNationId) {
+      showToast('请先在下方卡片中选择一个国家');
       return;
     }
-    setIsCreationWizardOpen(true);
+
+    const currentSelected = workspaceNations.find((n) => n.id === selectedNationId);
+    if (!currentSelected) return;
+
+    const provId = provinceInfo.id;
+    const provName = provinceInfo.name;
+    const cnName = getProvinceChineseName(provName || provId);
+
+    // 🌟 定都模式：将点击的省份直接确立为该国的法定都城，并确保该省份归属于该国
+    if (isSetCapitalMode) {
+      const isAlreadyOwned = currentSelected.provinces?.some(
+        (p) => String(p.id) === String(provId) || p.name.trim().toLowerCase() === provName.trim().toLowerCase()
+      );
+
+      const provPop = (provinceInfo.properties?.manpower as number) ??
+        (provinceInfo.properties?.population as number) ??
+        (1200000 + (Math.abs(Number(provId || 1) * 3821) % 4500000));
+
+      const newProvinceData: ProvinceData = {
+        id: provId,
+        name: provName,
+        population: provPop,
+        civilianFactories: 1,
+        militaryFactories: 0,
+        isCore: true,
+      };
+
+      const updatedNations = workspaceNations.map((n) => {
+        if (n.id === currentSelected.id) {
+          const nextProvinces = isAlreadyOwned
+            ? (n.provinces || [])
+            : [...(n.provinces || []), newProvinceData];
+          return {
+            ...n,
+            capital: cnName,
+            capitalId: provId,
+            provinces: nextProvinces,
+            totalPopulation: nextProvinces.reduce((sum, p) => sum + (p.population || 1500000), 0),
+          };
+        } else {
+          // 若该省份原本属于其他国家，从其他国家剥离
+          const nextProvinces = (n.provinces || []).filter(
+            (p) => !(String(p.id) === String(provId) || p.name.trim().toLowerCase() === provName.trim().toLowerCase())
+          );
+          return {
+            ...n,
+            provinces: nextProvinces,
+            totalPopulation: nextProvinces.reduce((sum, p) => sum + (p.population || 1500000), 0),
+          };
+        }
+      });
+
+      persistNationsUpdate(updatedNations);
+      setIsSetCapitalMode(false);
+      showToast(`已成功将【${cnName}】确立为【${currentSelected.name}】的法定都城！`);
+      return;
+    }
+
+    // 检查此省份是否已在当前选中国家名下
+    const isAlreadyOwnedByCurrent = currentSelected.provinces?.some(
+      (p) => String(p.id) === String(provId) || p.name.trim().toLowerCase() === provName.trim().toLowerCase()
+    );
+
+    let updatedNations: Nation[] = [];
+
+    if (isAlreadyOwnedByCurrent) {
+      // 移出当前国家
+      updatedNations = workspaceNations.map((n) => {
+        if (n.id === currentSelected.id) {
+          const nextProvinces = (n.provinces || []).filter(
+            (p) => !(String(p.id) === String(provId) || p.name.trim().toLowerCase() === provName.trim().toLowerCase())
+          );
+          return {
+            ...n,
+            provinces: nextProvinces,
+            totalPopulation: nextProvinces.reduce((sum, p) => sum + (p.population || 1500000), 0),
+          };
+        }
+        return n;
+      });
+      showToast(`已将【${cnName}】从【${currentSelected.name}】疆域移出`);
+    } else {
+      // 划入当前国家；若属于其他国家，则自动剥离（无需相邻限制）
+      const provPop = (provinceInfo.properties?.manpower as number) ??
+        (provinceInfo.properties?.population as number) ??
+        (1200000 + (Math.abs(Number(provId || 1) * 3821) % 4500000));
+
+      const newProvinceData: ProvinceData = {
+        id: provId,
+        name: provName,
+        population: provPop,
+        civilianFactories: 1,
+        militaryFactories: 0,
+        isCore: true,
+      };
+
+      updatedNations = workspaceNations.map((n) => {
+        if (n.id === currentSelected.id) {
+          const nextProvinces = [...(n.provinces || []), newProvinceData];
+          return {
+            ...n,
+            provinces: nextProvinces,
+            totalPopulation: nextProvinces.reduce((sum, p) => sum + (p.population || 1500000), 0),
+          };
+        } else {
+          const nextProvinces = (n.provinces || []).filter(
+            (p) => !(String(p.id) === String(provId) || p.name.trim().toLowerCase() === provName.trim().toLowerCase())
+          );
+          return {
+            ...n,
+            provinces: nextProvinces,
+            totalPopulation: nextProvinces.reduce((sum, p) => sum + (p.population || 1500000), 0),
+          };
+        }
+      });
+      showToast(`已划入【${cnName}】至【${currentSelected.name}】`);
+    }
+
+    persistNationsUpdate(updatedNations);
+  }, [selectedNationId, workspaceNations, persistNationsUpdate, showToast, isSetCapitalMode]);
+
+  // 框选批量划拨省份（核心需求：支持框选，取消相邻限制）
+  const handleBoxSelectProvinces = useCallback((selectedProvs: { id: string | number; name: string; properties?: any }[]) => {
+    if (!selectedNationId) {
+      showToast('请先选择要分配疆域的国家实体');
+      return;
+    }
+
+    const currentSelected = workspaceNations.find((n) => n.id === selectedNationId);
+    if (!currentSelected || selectedProvs.length === 0) return;
+
+    const selectedProvIdsSet = new Set(selectedProvs.map((p) => String(p.id)));
+
+    // 新增省份集合
+    const newlyAddedList: ProvinceData[] = [];
+    selectedProvs.forEach((p) => {
+      const alreadyHas = currentSelected.provinces?.some((cp) => String(cp.id) === String(p.id));
+      if (!alreadyHas) {
+        const provPop = (p.properties?.manpower as number) ??
+          (p.properties?.population as number) ??
+          (1200000 + (Math.abs(Number(p.id || 1) * 3821) % 4500000));
+        newlyAddedList.push({
+          id: p.id,
+          name: p.name,
+          population: provPop,
+          civilianFactories: 1,
+          militaryFactories: 0,
+          isCore: true,
+        });
+      }
+    });
+
+    if (newlyAddedList.length === 0) {
+      showToast('框选区域内所有省份已属于当前国家');
+      return;
+    }
+
+    // 批量归并至当前国家，并从其他国家名下移出
+    const updatedNations = workspaceNations.map((n) => {
+      if (n.id === currentSelected.id) {
+        const nextProvs = [...(n.provinces || []), ...newlyAddedList];
+        return {
+          ...n,
+          provinces: nextProvs,
+          totalPopulation: nextProvs.reduce((sum, p) => sum + (p.population || 1500000), 0),
+        };
+      } else {
+        const nextProvs = (n.provinces || []).filter((p) => !selectedProvIdsSet.has(String(p.id)));
+        return {
+          ...n,
+          provinces: nextProvs,
+          totalPopulation: nextProvs.reduce((sum, p) => sum + (p.population || 1500000), 0),
+        };
+      }
+    });
+
+    persistNationsUpdate(updatedNations);
+    showToast(`框选成功：已将 ${newlyAddedList.length} 个省份批量划入【${currentSelected.name}】`);
+  }, [selectedNationId, workspaceNations, persistNationsUpdate, showToast]);
+
+  // 清空某国家的全部疆域
+  const handleClearNationProvinces = (nationId: string) => {
+    const targetNation = workspaceNations.find((n) => n.id === nationId);
+    if (!targetNation) return;
+
+    setConfirmDialog({
+      isOpen: true,
+      title: '清空疆域划分',
+      message: `确定要清空【${targetNation.name}】已分配的全部 ${targetNation.provinces?.length || 0} 个省份领土吗？`,
+      confirmText: '确认清空',
+      isDangerous: true,
+      onConfirm: () => {
+        const updated = workspaceNations.map((n) =>
+          n.id === nationId ? { ...n, provinces: [], totalPopulation: 0 } : n
+        );
+        persistNationsUpdate(updated);
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        showToast(`已清空【${targetNation.name}】的全部疆域`);
+      },
+    });
   };
 
-  useEffect(() => {
-    const handleOpenWizard = () => {
-      handleOpenCreationWizard();
-    };
-    window.addEventListener('open-workspace-wizard', handleOpenWizard);
-    return () => window.removeEventListener('open-workspace-wizard', handleOpenWizard);
-  }, [isCreator]);
-
-  const handleEnterFullscreenMap = async () => {
-    setActiveNavTab('map');
-    try {
-      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-        await document.documentElement.requestFullscreen();
-        setIsFullscreenMap(true);
-      }
-    } catch (err) {
-      console.warn('Fullscreen entry prevented or unsupported in context', err);
-    }
-    showToast('已开启全景沉浸推演地图模式');
+  // 清空所有国家的疆域划分
+  const handleResetAllProvinces = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: '重置全图疆域',
+      message: '确定要清空当前沙盘内所有国家的疆域划定吗？所有省份将重置为中立未占领状态。',
+      confirmText: '清空全图',
+      isDangerous: true,
+      onConfirm: () => {
+        const updated = workspaceNations.map((n) => ({
+          ...n,
+          provinces: [],
+          totalPopulation: 0,
+        }));
+        persistNationsUpdate(updated);
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        showToast('已重置全图省份归属');
+      },
+    });
   };
 
-  const handleExitFullscreenMap = async () => {
-    try {
-      if (document.fullscreenElement && document.exitFullscreen) {
-        await document.exitFullscreen();
-      }
-    } catch (err) {
-      // ignore
-    }
-    setIsFullscreenMap(false);
+  // 删除某个国家
+  const handleDeleteNation = (nationId: string) => {
+    const target = workspaceNations.find((n) => n.id === nationId);
+    if (!target) return;
+
+    setConfirmDialog({
+      isOpen: true,
+      title: '解散国家实体',
+      message: `确定要解散国家【${target.name}】吗？其所属省份将重新释放为中立领土。`,
+      confirmText: '确认解散',
+      isDangerous: true,
+      onConfirm: () => {
+        const updated = workspaceNations.filter((n) => n.id !== nationId);
+        persistNationsUpdate(updated);
+        if (selectedNationId === nationId) {
+          setSelectedNationId(updated.length > 0 ? updated[0].id : null);
+        }
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        showToast(`国家实体【${target.name}】已解散`);
+      },
+    });
   };
 
-  // Trigger fullscreen automatically when entering map tab if preference enabled
-  useEffect(() => {
-    if (activeNavTab === 'map' && autoFullscreenMap && !document.fullscreenElement) {
-      try {
-        document.documentElement.requestFullscreen?.();
-      } catch {
-        // ignore
-      }
+  // 接收快速建国弹窗创建的新国家
+  const handleQuickNationCreated = (newNation: Nation) => {
+    const updated = [...workspaceNations, newNation];
+    persistNationsUpdate(updated);
+    setSelectedNationId(newNation.id);
+    showToast(`新国家【${newNation.name}】建立成功！已设为当前编辑国家`);
+  };
+
+  // 快速修改国家名称
+  const handleStartRenameNation = () => {
+    if (!selectedNation) return;
+    setRenameNationInput(selectedNation.name);
+    setIsRenamingNation(true);
+  };
+
+  const handleSaveRenameNation = () => {
+    if (!selectedNation) {
+      setIsRenamingNation(false);
+      return;
     }
-  }, [activeNavTab, autoFullscreenMap]);
-
-  // Toast feedback
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
-
-  const activeWs =
-    workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0];
-
-  useEffect(() => {
-    const handleUpdate = () => {
-      setWorkspaces(workspaceService.getWorkspaces());
-      setActiveWorkspaceId(workspaceService.getActiveWorkspaceId());
-    };
-    window.addEventListener('workspaces-updated', handleUpdate);
-    window.addEventListener('active-workspace-changed', handleUpdate);
-    return () => {
-      window.removeEventListener('workspaces-updated', handleUpdate);
-      window.removeEventListener('active-workspace-changed', handleUpdate);
-    };
-  }, []);
-
-  // Close more menu on click outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
-        setShowMoreMenu(false);
-      }
-    };
-    if (showMoreMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
+    const newName = renameNationInput.trim();
+    if (!newName) {
+      setIsRenamingNation(false);
+      return;
     }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+    const updated = workspaceNations.map((n) =>
+      n.id === selectedNation.id ? { ...n, name: newName } : n
+    );
+    persistNationsUpdate(updated);
+    setIsRenamingNation(false);
+    showToast(`已更新国家名称为【${newName}】`);
+  };
+
+  // 快捷更新国家疆域代表色（地图即刻实时重绘并持久化）
+  const handleUpdateNationColor = useCallback(
+    (nationId: string, newColor: string) => {
+      const targetNation = workspaceNations.find((n) => n.id === nationId);
+      const updated = workspaceNations.map((n) =>
+        n.id === nationId ? { ...n, flagColor: newColor } : n
+      );
+      persistNationsUpdate(updated);
+      showToast(`已更新【${targetNation?.name || '国家'}】的疆域代表色`);
+    },
+    [workspaceNations, persistNationsUpdate, showToast]
+  );
+
+  // 创作者删除自建剧本（释放创建配额，最多3个）
+  const handleDeleteWorkspace = (ws: WorkspaceItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (ws.id === 'ws_default_1936') {
+      showToast('系统基础剧本不可删除');
+      return;
+    }
+
+    setConfirmDialog({
+      isOpen: true,
+      title: '删除自建剧本',
+      message: `确定要删除自建剧本【${ws.name}】吗？删除后将彻底移除该剧本及其所有国家实体，并释放 1 个剧本创建配额。`,
+      confirmText: '确认删除并释放配额',
+      isDangerous: true,
+      onConfirm: () => {
+        const result = workspaceService.deleteWorkspace(ws.id);
+        const updatedList = workspaceService.getWorkspaces();
+        setWorkspacesList(updatedList);
+
+        if (activeWorkspace?.id === ws.id) {
+          const fallback = updatedList[0];
+          if (fallback) {
+            setActiveWorkspace(fallback);
+            setWorkspaceNations(fallback.customNations || []);
+            setSelectedNationId(fallback.customNations?.[0]?.id || null);
+          }
+        }
+
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        showToast(result.message || '已成功删除剧本并释放配额');
+      },
+    });
+  };
+
+  // 切换工作区剧本
+  const handleSwitchWorkspace = (ws: WorkspaceItem) => {
+    workspaceService.setActiveWorkspaceId(ws.id);
+    setActiveWorkspace(ws);
+    const nations = ws.customNations && ws.customNations.length > 0 ? ws.customNations : [];
+    setWorkspaceNations(nations);
+    setSelectedNationId(nations.length > 0 ? nations[0].id : null);
+    setShowScenarioSwitchModal(false);
+    showToast(`已切换至剧本【${ws.name}】`);
+  };
+
+  // 新建剧本向导完成
+  const handleWizardSuccess = (created: WorkspaceItem) => {
+    setShowCreationWizard(false);
+    const all = workspaceService.getWorkspaces();
+    setWorkspacesList(all);
+    setActiveWorkspace(created);
+    const nations = created.customNations || [];
+    setWorkspaceNations(nations);
+    setSelectedNationId(nations.length > 0 ? nations[0].id : null);
+    showToast(`新推演剧本【${created.name}】创建成功！`);
+    // 自动弹新建国弹窗引导建国
+    setIsQuickNationModalOpen(true);
+  };
+
+  // 导出剧本 JSON
+  const handleExportScenarioJSON = () => {
+    if (!activeWorkspace) return;
+    const exportData = {
+      ...activeWorkspace,
+      customNations: workspaceNations,
+      exportedAt: new Date().toISOString(),
+      version: '1.0',
     };
-  }, [showMoreMenu]);
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `scenario_${activeWorkspace.id}_${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('沙盘剧本已导出为 JSON 配置文件');
+  };
+
+  // 地图缩放与重置控制
+  const handleMapZoomIn = () => {
+    window.dispatchEvent(new CustomEvent('map-zoom-in'));
+  };
+
+  const handleMapZoomOut = () => {
+    window.dispatchEvent(new CustomEvent('map-zoom-out'));
+  };
+
+  const handleMapReset = () => {
+    window.dispatchEvent(new CustomEvent('map-reset-view'));
+  };
 
   if (!isOpen) return null;
 
-  const showToast = (msg: string) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 2500);
-  };
-
-  const currentDeviceId =
-    user?.id ||
-    'guest_device_' +
-      (localStorage.getItem('chuanglian_guest_device_id') ||
-        (() => {
-          const gen = Math.random().toString(36).substring(2, 10);
-          localStorage.setItem('chuanglian_guest_device_id', gen);
-          return gen;
-        })());
-
-  const hasLikedCurrent = activeWs
-    ? workspaceService.hasLiked(activeWs.id, currentDeviceId)
-    : false;
-
-  const activeChronicles = activeWs
-    ? workspaceService.getChronicles(activeWs.id)
-    : [];
-
-  const handleLike = (wsId: string) => {
-    workspaceService.toggleLike(wsId, currentDeviceId);
-    setWorkspaces(workspaceService.getWorkspaces());
-  };
-
-  const handleSelectWorkspace = (ws: WorkspaceItem) => {
-    workspaceService.setActiveWorkspaceId(ws.id);
-    setActiveWorkspaceId(ws.id);
-    if (onWorkspaceSelected) onWorkspaceSelected(ws);
-    setActiveDrawer(null);
-    showToast(`已载入工作区：${ws.name}`);
-  };
-
-  const handleCreateWorkspace = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName.trim()) return;
-
-    const chosenEra =
-      newEra === '自定义' ? newCustomEra.trim() || '自定义纪元' : newEra;
-    const creatorName =
-      user?.douyinName || user?.username || '创联推演者';
-    const creatorId =
-      user?.id || 'usr_creator_' + Math.random().toString(36).substring(2, 7);
-
-    const created = workspaceService.createWorkspace({
-      name: newName.trim(),
-      era: chosenEra,
-      scenarioType: newScenarioType,
-      scenarioName: newName.trim(),
-      scenarioEra: chosenEra,
-      scenarioDesc: newDescription.trim(),
-      visibility: newVisibility,
-      description: newDescription.trim(),
-      creatorId,
-      creatorName,
-    });
-
-    setWorkspaces(workspaceService.getWorkspaces());
-    setActiveWorkspaceId(created.id);
-    if (onWorkspaceSelected) onWorkspaceSelected(created);
-    setActiveDrawer(null);
-    showToast(`已成功创建并激活工作区：${created.name}`);
-    setNewName('');
-    setNewDescription('');
-  };
-
-  const handleUpdateWorkspace = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingWorkspace) return;
-
-    workspaceService.updateWorkspace(editingWorkspace.id, {
-      name: editingWorkspace.name,
-      era: editingWorkspace.era,
-      visibility: editingWorkspace.visibility,
-      description: editingWorkspace.description,
-    });
-
-    setWorkspaces(workspaceService.getWorkspaces());
-    setEditingWorkspace(null);
-    setActiveDrawer(null);
-    showToast('工作区设置已更新');
-  };
-
-  const handleSendComment = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!commentText.trim()) return;
-    setCommentError(null);
-
-    const isGuest = !isAuthenticated;
-    const authorName = isAuthenticated
-      ? user?.douyinName || user?.username || '领主'
-      : guestName.trim() || '访客探员';
-
-    const result = workspaceService.addComment(activeWs.id, {
-      authorName,
-      authorAvatar: user?.avatarUrl,
-      authorColor: user?.avatarColor || '#6366f1',
-      content: commentText.trim(),
-      isGuest,
-    });
-
-    if (!result.success) {
-      if (result.requiresAuth) {
-        setCommentError(
-          result.message || '访客免登录留言已达上限（3条），请注册账户继续互动'
-        );
-        setTimeout(() => {
-          onOpenAuth('register');
-        }, 1200);
-      } else {
-        setCommentError(result.message || '留言失败');
-      }
-      return;
-    }
-
-    setCommentText('');
-    setWorkspaces(workspaceService.getWorkspaces());
-  };
-
-  // Swipe-to-exit gesture state (大幅度向右滑动页面退出进入主页)
-  const [swipeX, setSwipeX] = useState(0);
-  const [isSwiping, setIsSwiping] = useState(false);
-  const [isExitingViaSwipe, setIsExitingViaSwipe] = useState(false);
-  const touchStartPos = useRef<{ x: number; y: number; time: number } | null>(null);
-  const isHorizontalSwipe = useRef<boolean | null>(null);
-
-  const handleOpenSettings = () => {
-    if (activeWs) {
-      setEditingWorkspace(activeWs);
-      setActiveDrawer('edit');
-    }
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    // If a drawer or wizard is open, let drawer handle its own touches
-    if (activeDrawer || isCreationWizardOpen) return;
-
-    // Avoid hijacking inputs, buttons, sliders, or map canvas panning
-    const target = e.target as HTMLElement | null;
-    if (
-      target?.closest(
-        'input, textarea, select, button, .leaflet-container, canvas, [data-prevent-swipe="true"]'
-      )
-    ) {
-      return;
-    }
-
-    const touch = e.touches[0];
-    // If on map tab, only allow edge swipe from left side (e.g. x < 45) to not conflict with map panning
-    if (activeNavTab === 'map' && touch.clientX > 45) {
-      return;
-    }
-
-    touchStartPos.current = {
-      x: touch.clientX,
-      y: touch.clientY,
-      time: Date.now(),
-    };
-    isHorizontalSwipe.current = null;
-    setIsSwiping(false);
-    setSwipeX(0);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!touchStartPos.current || isExitingViaSwipe) return;
-
-    const touch = e.touches[0];
-    const deltaX = touch.clientX - touchStartPos.current.x;
-    const deltaY = touch.clientY - touchStartPos.current.y;
-
-    // Determine direction on first subtle movement (> 5px)
-    if (isHorizontalSwipe.current === null) {
-      if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
-        // Only trigger if moving rightwards and horizontal movement clearly leads
-        if (deltaX > 0 && deltaX > Math.abs(deltaY) * 1.05) {
-          isHorizontalSwipe.current = true;
-        } else {
-          isHorizontalSwipe.current = false;
-        }
-      }
-    }
-
-    if (isHorizontalSwipe.current) {
-      if (deltaX > 0) {
-        setIsSwiping(true);
-        // Dampen swipe smoothly for responsive, natural physical feel
-        const dampenedX = deltaX > 90 ? 90 + (deltaX - 90) * 0.35 : deltaX;
-        setSwipeX(dampenedX);
-      }
-    }
-  };
-
-  const handleTouchEnd = () => {
-    if (!touchStartPos.current || !isHorizontalSwipe.current || isExitingViaSwipe) {
-      touchStartPos.current = null;
-      isHorizontalSwipe.current = null;
-      setIsSwiping(false);
-      setSwipeX(0);
-      return;
-    }
-
-    const elapsed = Date.now() - touchStartPos.current.time;
-    const velocity = swipeX / Math.max(elapsed, 1); // px/ms
-
-    // Natural shortened threshold: Distance >= 52px, or distance >= 32px with flick velocity > 0.30 px/ms
-    const isExitSwipe = swipeX >= 52 || (swipeX >= 32 && velocity > 0.30);
-
-    if (isExitSwipe) {
-      setIsExitingViaSwipe(true);
-      showToast('正在退出工作区，返回主页...');
-      setTimeout(() => {
-        onClose();
-        setIsExitingViaSwipe(false);
-        setSwipeX(0);
-        setIsSwiping(false);
-      }, 180);
-    } else {
-      setSwipeX(0);
-      setIsSwiping(false);
-    }
-
-    touchStartPos.current = null;
-    isHorizontalSwipe.current = null;
-  };
-
-  const handleTouchCancel = () => {
-    touchStartPos.current = null;
-    isHorizontalSwipe.current = null;
-    setIsSwiping(false);
-    setSwipeX(0);
-  };
-
-  // Content for the entire workstation (Full-Screen Single-Page Experience)
-  const renderWorkstationContent = () => (
-    <div
-      className="w-full h-full bg-[#F8F9FC] text-slate-800 flex flex-col overflow-hidden select-none relative"
-      style={{
-        transform: isExitingViaSwipe
-          ? 'translateX(100%)'
-          : isSwiping
-          ? `translateX(${Math.min(swipeX * 0.28, 48)}px)`
-          : 'none',
-        opacity: isExitingViaSwipe ? 0 : 1,
-        transition: isExitingViaSwipe
-          ? 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease-out'
-          : isSwiping
-          ? 'none'
-          : 'transform 0.25s ease-out, opacity 0.25s ease-out',
-      }}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchCancel}
-    >
-      {/* Dynamic Gesture Feedback Indicator on Left Screen Edge */}
-      {swipeX > 6 && (
-        <div
-          className="fixed top-1/2 -translate-y-1/2 left-0 z-50 pointer-events-none transition-all duration-75 flex items-center"
-          style={{
-            transform: `translateX(${Math.min(swipeX * 0.6, 52)}px) translateY(-50%)`,
-            opacity: Math.min(swipeX / 30, 1),
-          }}
-        >
-          <div
-            className={`flex items-center gap-2 px-3 py-2 rounded-r-2xl shadow-xl backdrop-blur-md border transition-all duration-150 ${
-              swipeX >= 52
-                ? 'bg-indigo-600 text-white border-indigo-500 scale-105 shadow-indigo-500/25'
-                : 'bg-white/95 text-slate-800 border-slate-200/90 shadow-slate-900/10'
-            }`}
-          >
-            <ArrowRight
-              className={`w-4 h-4 transition-transform duration-150 shrink-0 ${
-                swipeX >= 52 ? 'translate-x-1 text-white' : 'text-indigo-600'
-              }`}
-            />
-            <div className="flex flex-col">
-              <span className="text-xs font-black tracking-tight leading-tight">
-                {swipeX >= 52 ? '松手立即退出' : '轻滑退出'}
-              </span>
-              <span
-                className={`text-[10px] font-medium leading-none ${
-                  swipeX >= 52 ? 'text-indigo-100' : 'text-slate-400'
-                }`}
-              >
-                返回大厅主页
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 1. TOP HEADER: 工作区全局顶栏 (← 推演工作区 · 导航标签 · 快捷操作) */}
-      <header className="shrink-0 bg-white/98 backdrop-blur-md border-b border-slate-200/90 px-2 sm:px-4 py-2 flex items-center justify-between gap-1.5 sm:gap-2 shadow-2xs relative z-50">
-        {/* Left: Back & Workspace Identity */}
-        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1">
+  return (
+    <div className="fixed inset-0 z-[100] bg-[#F1F5F9] overflow-hidden select-none font-sans text-slate-800">
+      {/* 🌟 顶部悬浮导航栏：轻、薄、悬浮于地图上方 */}
+      <div className="absolute top-3 left-3 right-3 z-30 pointer-events-none flex items-center justify-between gap-2">
+        {/* 左侧：返回按钮 + 分配疆域胶囊下拉 + 历史时代标记 */}
+        <div className="pointer-events-auto flex items-center gap-2">
           <button
-            id="ws-header-back-btn"
-            type="button"
-            onClick={activeNavTab !== 'overview' ? () => setActiveNavTab('overview') : onClose}
-            className="p-1.5 text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition cursor-pointer active:scale-95 shrink-0 flex items-center gap-1 font-bold text-xs"
-            title={activeNavTab !== 'overview' ? '返回工作区总览' : '返回主页（亦可向右轻滑页面退出）'}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">{activeNavTab !== 'overview' ? '返回总览' : '返回主页'}</span>
-          </button>
-
-          <div className="h-4 w-px bg-slate-200 shrink-0 hidden sm:block" />
-
-          {/* Workspace Title & Era Badge */}
-          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
-            <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0 shadow-2xs">
-              <FolderGit2 className="w-4 h-4" />
-            </div>
-
-            <div className="min-w-0 flex items-center gap-1.5 flex-1">
-              <h1 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight truncate max-w-[170px] xs:max-w-[230px] sm:max-w-[340px] md:max-w-[460px]">
-                {activeWs?.name || '1936 全球风云地缘沙盘'}
-              </h1>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 shrink-0">
-                {activeWs?.era || '1936年'}
-              </span>
-              <span
-                className={`hidden sm:inline-flex px-1.5 py-0.2 rounded text-[10px] font-bold items-center gap-0.5 shrink-0 ${
-                  activeWs?.visibility === 'public'
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : 'bg-amber-50 text-amber-700'
-                }`}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    activeWs?.visibility === 'public' ? 'bg-emerald-500' : 'bg-amber-500'
-                  }`}
-                />
-                <span>{activeWs?.visibility === 'public' ? '公开' : '私密'}</span>
-              </span>
-
-              {/* Sub-view Breadcrumb indicator when inside a module */}
-              {activeNavTab !== 'overview' && (
-                <div className="flex items-center gap-1 shrink-0 ml-1">
-                  <span className="text-slate-300 text-xs">/</span>
-                  <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100/80">
-                    {activeNavTab === 'scenarios' && '剧本库'}
-                    {activeNavTab === 'events' && '战报大事记'}
-                    {activeNavTab === 'nations' && '参演国家'}
-                    {activeNavTab === 'rules' && '推演规则'}
-                    {activeNavTab === 'map' && '全景地图'}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Actions (全屏地图 | 设置 | 沙盘库 | 更多 | 退出) */}
-        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0" ref={moreMenuRef}>
-          {/* 全屏地图 快捷入口 */}
-          <button
-            id="ws-header-fullscreen-btn"
-            type="button"
-            onClick={isFullscreenMap ? handleExitFullscreenMap : handleEnterFullscreenMap}
-            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer border ${
-              isFullscreenMap || activeNavTab === 'map'
-                ? 'bg-indigo-50 hover:bg-indigo-100/80 text-indigo-700 border-indigo-200/90 shadow-2xs'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200/90'
-            }`}
-            title={isFullscreenMap ? '退出全屏沉浸地图' : '全屏进入推演地图'}
-          >
-            {isFullscreenMap ? (
-              <Minimize2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-            ) : (
-              <Maximize2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-            )}
-            <span className="hidden xs:inline sm:inline">{isFullscreenMap ? '退出全屏' : '全屏地图'}</span>
-          </button>
-
-          {/* 设置 快捷入口 (沙盘参数配置与编辑) */}
-          <button
-            id="ws-header-settings-btn"
-            type="button"
-            onClick={handleOpenSettings}
-            className="flex items-center gap-1 p-1.5 sm:px-2 sm:py-1.5 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition cursor-pointer active:scale-95 text-xs font-bold"
-            title="沙盘设置与参数调整"
-          >
-            <SlidersHorizontal className="w-4 h-4 text-slate-600" />
-            <span className="hidden md:inline">设置</span>
-          </button>
-
-          {/* 沙盘库 */}
-          <button
-            id="ws-info-pill-btn"
-            type="button"
-            onClick={() => setActiveDrawer('info')}
-            className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold transition active:scale-95 cursor-pointer shadow-2xs"
-            title="工作区信息与切换沙盘"
-          >
-            <FolderGit2 className="w-3.5 h-3.5 text-slate-600" />
-            <span>沙盘库</span>
-          </button>
-
-          {/* More Options Dropdown Button */}
-          <div className="relative">
-            <button
-              id="ws-header-more-btn"
-              type="button"
-              onClick={() => setShowMoreMenu(!showMoreMenu)}
-              className="p-1.5 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition cursor-pointer active:scale-95"
-              title="更多操作"
-            >
-              <MoreVertical className="w-4 h-4" />
-            </button>
-
-            {showMoreMenu && (
-              <>
-                {/* Fullscreen transparent backdrop to capture clicks outside and prevent click-through */}
-                <div
-                  className="fixed inset-0 z-40 bg-transparent"
-                  onClick={() => setShowMoreMenu(false)}
-                />
-                <div className="absolute right-0 mt-1.5 w-52 sm:w-56 bg-white/98 backdrop-blur-md border border-slate-200/90 rounded-2xl shadow-2xl p-1.5 z-50 space-y-1 animate-fadeIn">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleOpenSettings();
-                      setShowMoreMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 rounded-xl cursor-pointer transition"
-                  >
-                    <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                    <span>沙盘设置与规则调整</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveDrawer('info');
-                      setShowMoreMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 rounded-xl cursor-pointer transition"
-                  >
-                    <FolderGit2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                    <span>切换推演工作区</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleOpenCreationWizard();
-                      setShowMoreMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 rounded-xl cursor-pointer transition"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                    <span>分步构筑新沙盘</span>
-                  </button>
-
-                  {/* 次级研判留言记录入口 */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveDrawer('comments');
-                      setShowMoreMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 rounded-xl cursor-pointer transition"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                    <span>推演研判记录</span>
-                    {(activeWs?.comments || []).length > 0 && (
-                      <span className="ml-auto text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200/60">
-                        {(activeWs?.comments || []).length}
-                      </span>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(window.location.href);
-                      showToast('已复制工作区直达链接');
-                      setShowMoreMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 rounded-xl cursor-pointer transition"
-                  >
-                    <Share2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                    <span>分享沙盘链接</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      window.location.reload();
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 rounded-xl cursor-pointer transition"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                    <span>刷新沙盘数据</span>
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-
-          <button
-            id="ws-header-close-btn"
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer active:scale-95"
-            title="退出工作区返回主页"
+            className="w-9 h-9 rounded-2xl bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-md flex items-center justify-center text-slate-700 hover:text-slate-950 transition active:scale-95 cursor-pointer"
+            title="退出工作台并返回沙盘"
           >
-            <X className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4 stroke-[2.2]" />
+          </button>
+
+          {/* 分配疆域胶囊下拉 */}
+          <button
+            type="button"
+            onClick={() => setShowScenarioSwitchModal(true)}
+            className="px-3 py-1.5 rounded-2xl bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-md flex items-center gap-1.5 text-xs font-bold text-slate-800 hover:bg-slate-50 transition active:scale-95 cursor-pointer"
+          >
+            <MapPin className="w-3.5 h-3.5 text-[#6C4FF6] stroke-[2.4]" />
+            <span>分配疆域</span>
+            <ChevronDown className="w-3 h-3 text-slate-400" />
+          </button>
+
+          {/* 剧本与纪元副标题 */}
+          <span className="text-[11px] text-slate-500 font-medium hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/85 backdrop-blur-md border border-slate-200/70 shadow-2xs">
+            <span>{activeWorkspace?.name || '粉陆纪元'}</span>
+            <span className="text-slate-300">·</span>
+            <span>{activeWorkspace?.era ? `${activeWorkspace.era}年` : '1936年'}</span>
+          </span>
+        </div>
+
+        {/* 右侧：国家排行唤起按钮 + 更多操作 */}
+        <div className="pointer-events-auto flex items-center gap-1.5 relative">
+          <button
+            type="button"
+            onClick={() => setIsRankingModalOpen(true)}
+            className="px-3 py-1.5 rounded-2xl bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-md flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-[#6C4FF6] hover:bg-slate-50 transition active:scale-95 cursor-pointer"
+            title="查看国家排行"
+          >
+            <Trophy className="w-3.5 h-3.5 text-[#6C4FF6]" />
+            <span>国家排行</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 text-[10px] font-mono">
+              {workspaceNations.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowMoreActions(!showMoreActions)}
+            className="w-9 h-9 rounded-2xl bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-md flex items-center justify-center text-slate-600 hover:text-slate-900 transition active:scale-95 cursor-pointer"
+            title="更多操作"
+          >
+            <MoreHorizontal className="w-4 h-4" />
+          </button>
+
+          {/* 更多操作浮层菜单 */}
+          {showMoreActions && (
+            <div className="absolute right-0 top-11 w-44 bg-white/98 backdrop-blur-xl rounded-2xl border border-slate-200/90 shadow-2xl p-1.5 z-40 text-xs text-slate-700 animate-fadeIn">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMoreActions(false);
+                  setShowScenarioSwitchModal(true);
+                }}
+                className="w-full px-2.5 py-1.5 rounded-xl hover:bg-slate-100 flex items-center gap-2 transition cursor-pointer text-left"
+              >
+                <Layers className="w-3.5 h-3.5 text-slate-500" />
+                <span>切换推演剧本</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMoreActions(false);
+                  handleExportScenarioJSON();
+                }}
+                className="w-full px-2.5 py-1.5 rounded-xl hover:bg-slate-100 flex items-center gap-2 transition cursor-pointer text-left"
+              >
+                <Download className="w-3.5 h-3.5 text-slate-500" />
+                <span>导出剧本 JSON</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMoreActions(false);
+                  handleResetAllProvinces();
+                }}
+                className="w-full px-2.5 py-1.5 rounded-xl hover:bg-rose-50 text-rose-600 flex items-center gap-2 transition cursor-pointer text-left"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-rose-500" />
+                <span>清空全图疆域</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 🌟 1. 地图主体：绝对视觉主角，100% 铺满视口全屏 */}
+      <div className="absolute inset-0 w-full h-full z-0 overflow-hidden">
+            <WorldMap
+              nations={workspaceNations}
+              workspaceHighlightNationId={selectedNationId}
+              onProvinceClick={handleMapProvinceClick}
+              isBoxSelectMode={isBoxSelectMode}
+              onBoxSelectProvinces={handleBoxSelectProvinces}
+              onSelectNation={(n) => {
+                setSelectedNationId(n.id);
+                setActiveMode('territory');
+                showToast(`已切换至【${n.name}】进行疆域划拨`);
+              }}
+              isFullscreen={isFullscreen}
+              onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
+              isWorkspaceEditor={true}
+              mapMode={mapMode}
+              layerSettings={layerSettings}
+            />
+      </div>
+
+      {/* 🌟 2. 左上角悬浮当前国家卡片：点击以非线性动画展开为国家列表卡片（图二样式） */}
+      <div ref={nationCardRef} className="absolute top-14 sm:top-15 left-3 z-30 pointer-events-auto flex items-center gap-1.5">
+        <AnimatePresence mode="wait">
+          {!isNationListOpen ? (
+            /* 图一：极简药丸徽章 */
+            <motion.div
+              key="nation-collapsed-pill"
+              initial={{ opacity: 0, scale: 0.92, y: -4 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: -4 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 26, mass: 0.8 }}
+              style={{ transformOrigin: 'top left' }}
+              onClick={() => {
+                setIsNationListOpen(true);
+                setIsSearchExpanded(false);
+              }}
+              className="px-2.5 py-1.5 rounded-2xl bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-md hover:shadow-lg transition cursor-pointer flex items-center gap-2.5 min-w-[145px] max-w-[230px] group select-none"
+              title="点击展开国家列表"
+            >
+              <div
+                style={{ aspectRatio: getAspectRatioCSS(selectedNation?.flagRatio) }}
+                className="h-5.5 max-w-10 rounded-md overflow-hidden bg-slate-100 border border-slate-200/80 shrink-0 shadow-2xs flex items-center justify-center"
+              >
+                <NationFlagDisplay
+                  flagUrl={selectedNation?.flagUrl}
+                  flagColor={selectedNation?.flagColor}
+                  name={selectedNation?.name || '国家'}
+                  ratio={selectedNation?.flagRatio}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1">
+                  <span className="font-bold text-xs text-slate-900 truncate">
+                    {selectedNation ? selectedNation.name : '未选择国家'}
+                  </span>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700 shrink-0 transition" />
+                </div>
+                <p className="text-[10px] text-slate-500 font-medium truncate">
+                  {selectedNation
+                    ? `${selectedNation.provinces?.length || 0}省 · 人口${formatPopulation(calculateNationTotalPop(selectedNation))}`
+                    : '点击选择国家'}
+                </p>
+              </div>
+            </motion.div>
+          ) : (
+            /* 图二：非线性展开的国家列表浮动面板 */
+            <motion.div
+              key="nation-expanded-card"
+              initial={{ opacity: 0, scale: 0.88, y: -8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.88, y: -8 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25, mass: 0.8 }}
+              style={{ transformOrigin: 'top left' }}
+              className="w-56 sm:w-60 bg-white/98 backdrop-blur-2xl border border-slate-200/90 rounded-2xl shadow-2xl p-2.5 flex flex-col gap-2 select-none"
+            >
+              {/* 头部：标题 + 数量小徽章，右侧搜索与关闭按钮 */}
+              <div className="flex items-center justify-between pb-1 border-b border-slate-100/90">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-xs text-slate-900">国家列表</span>
+                  <span className="w-4.5 h-4.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-semibold flex items-center justify-center">
+                    {workspaceNations.length}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1 text-slate-400">
+                  <button
+                    type="button"
+                    onClick={() => setIsSearchExpanded(!isSearchExpanded)}
+                    className={`p-1 rounded-lg transition cursor-pointer ${
+                      isSearchExpanded ? 'bg-slate-100 text-slate-700' : 'hover:bg-slate-100 hover:text-slate-700'
+                    }`}
+                    title="搜索国家"
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsNationListOpen(false)}
+                    className="p-1 rounded-lg hover:bg-slate-100 hover:text-slate-700 transition cursor-pointer"
+                    title="收起列表"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* 展开的搜索框 */}
+              <AnimatePresence>
+                {isSearchExpanded && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.16 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={searchKeyword}
+                        onChange={(e) => setSearchKeyword(e.target.value)}
+                        placeholder="搜索国家..."
+                        autoFocus
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-[#6C4FF6]"
+                      />
+                      {searchKeyword && (
+                        <button
+                          type="button"
+                          onClick={() => setSearchKeyword('')}
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* 国家列表项 */}
+              <div className="max-h-56 overflow-y-auto space-y-1 custom-scrollbar pr-0.5">
+                {filteredNations.map((nation) => {
+                  const isSelected = selectedNationId === nation.id;
+                  const provCount = nation.provinces?.length || 0;
+
+                  return (
+                    <div
+                      key={nation.id}
+                      onClick={() => {
+                        setSelectedNationId(nation.id);
+                        setActiveMode('territory');
+                        showToast(`已选中【${nation.name}】进行疆域划拨`);
+                      }}
+                      className={`px-2 py-1.5 rounded-xl flex items-center justify-between gap-2 cursor-pointer transition text-left group ${
+                        isSelected
+                          ? 'bg-[#F0ECFF] text-[#6C4FF6]'
+                          : 'hover:bg-slate-50 text-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div
+                          style={{ aspectRatio: getAspectRatioCSS(nation.flagRatio) }}
+                          className="h-5 max-w-9 rounded-xs overflow-hidden bg-slate-100 border border-slate-200 shrink-0 shadow-2xs flex items-center justify-center"
+                        >
+                          <NationFlagDisplay
+                            flagUrl={nation.flagUrl}
+                            flagColor={nation.flagColor}
+                            name={nation.name}
+                            ratio={nation.flagRatio}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <span
+                          className={`text-xs truncate ${
+                            isSelected ? 'font-bold text-[#6C4FF6]' : 'font-medium text-slate-800'
+                          }`}
+                        >
+                          {nation.name}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span
+                          className={`text-[11px] font-medium ${
+                            isSelected ? 'text-[#6C4FF6]' : 'text-slate-400'
+                          }`}
+                        >
+                          {provCount} 省
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDetailNationId(nation.id);
+                            setIsNationDetailOpen(true);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-slate-200/60 text-slate-400 hover:text-slate-700 transition"
+                          title="查看国家档案"
+                        >
+                          <ChevronRight className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {filteredNations.length === 0 && (
+                  <div className="py-6 text-center text-slate-400 text-xs">
+                    未找到匹配国家
+                  </div>
+                )}
+              </div>
+
+              {/* 底部大按钮：+ 新建国家 */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsNationListOpen(false);
+                  setIsQuickNationModalOpen(true);
+                }}
+                className="w-full py-2 px-3 rounded-xl bg-[#F0ECFF] hover:bg-[#E4DAFF] text-[#6C4FF6] font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-98 shadow-2xs cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>新建国家</span>
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 优美不占空间的疆域代表色收纳器 */}
+        {!isNationListOpen && selectedNation && (
+          <TerritoryColorPicker
+            color={selectedNation.flagColor || '#3b82f6'}
+            nationName={selectedNation.name}
+            onChange={(newColor) => handleUpdateNationColor(selectedNation.id, newColor)}
+            variant="compact"
+            placement="bottom-end"
+          />
+        )}
+      </div>
+
+      {/* 🌟 3. 右上角悬浮地图工具箱：默认收起为圆角小按钮，点击展开 */}
+      <div className="absolute top-14 sm:top-15 right-3 z-20 pointer-events-auto flex flex-col items-end gap-1.5">
+        <div className="flex items-center gap-1.5">
+          {/* 一键下载纯净地图快捷按钮 */}
+          <button
+            type="button"
+            onClick={handleDownloadPureMapPng}
+            disabled={isExportingMap}
+            className="h-9 px-2.5 rounded-2xl border shadow-md flex items-center gap-1.5 transition active:scale-95 cursor-pointer bg-white/95 backdrop-blur-xl border-slate-200/90 text-slate-700 hover:text-slate-950 text-xs font-semibold disabled:opacity-50"
+            title="下载当前视角下的无UI纯净世界地图 (.png)"
+          >
+            <Download className="w-4 h-4 text-slate-600" />
+            <span className="hidden sm:inline">{isExportingMap ? '导出中...' : '下载地图'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsMapToolsExpanded(!isMapToolsExpanded)}
+            className={`w-9 h-9 rounded-2xl border shadow-md flex items-center justify-center transition active:scale-95 cursor-pointer ${
+              isMapToolsExpanded
+                ? 'bg-[#6C4FF6] border-[#6C4FF6] text-white shadow-indigo-500/20'
+                : 'bg-white/95 backdrop-blur-xl border-slate-200/90 text-slate-700 hover:text-slate-950'
+            }`}
+            title={isMapToolsExpanded ? '收起地图工具' : '展开地图工具'}
+          >
+            <Crosshair className="w-4 h-4 stroke-[2.2]" />
           </button>
         </div>
-      </header>
 
-      {/* 2. MAIN CONTENT VIEW CONTAINER (一页看完整体页面 / 纯净全屏沉浸式) */}
-      <main className="flex-1 w-full h-[calc(100vh-52px)] overflow-hidden p-2 sm:p-3">
-        {/* VIEW 1: 概览 (OVERVIEW) - Single-Screen Fitted Dashboard */}
-        {activeNavTab === 'overview' && (
-          <div className="h-full w-full">
-            {/* Desktop & Tablet Layout (sm and up >= 640px): 2 Columns fitting 100% of viewport, maximizing map width */}
-            <div className="hidden sm:flex gap-2 lg:gap-2.5 h-full overflow-hidden">
-              {/* Left Column: Hero Interactive Map (Expanded, takes 80-88% of screen) */}
-              <section
-                aria-label="核心地图区域"
-                className="flex-1 h-full min-w-0 rounded-2xl overflow-hidden border border-slate-200/90 shadow-2xs relative bg-slate-100 flex flex-col"
-              >
-                <WorldMap
-                  nations={activeNations}
-                  myNation={myNation}
-                  onSelectNation={onSelectNation}
-                  onOpenDiplomacy={onOpenDiplomacy}
-                  onToggleFullscreen={handleEnterFullscreenMap}
-                  isFullscreen={isFullscreenMap}
-                />
-              </section>
-
-              {/* Right Column: Status & 2x2 Modules (Ultra-compact slim width: 190px - 225px) */}
-              <aside
-                aria-label="工作区状态与模块"
-                className="w-44 md:w-48 lg:w-52 xl:w-56 shrink-0 h-full flex flex-col justify-between gap-1.5 overflow-y-auto no-scrollbar"
-              >
-                {/* 1. Workspace Info & Status Card */}
-                <div className="bg-white border border-slate-200/90 rounded-xl p-2 shadow-2xs space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1 min-w-0">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                      <span className="text-[11px] font-black text-slate-800 truncate">活跃推演沙盘</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setActiveDrawer('info')}
-                      className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 cursor-pointer shrink-0"
-                    >
-                      切换
-                    </button>
-                  </div>
-
-                  <p className="text-[10px] text-slate-600 font-medium leading-relaxed bg-slate-50/80 p-1.5 rounded-lg border border-slate-100 line-clamp-2">
-                    {activeWs?.description ||
-                      '1936年欧亚大陆地缘大变局，世界秩序重构的前夜。包含完备的国界拓扑、工业实力与地缘条约。'}
-                  </p>
-                </div>
-
-                {/* 2. 2x2 Core Functional Modules */}
-                <div className="bg-white border border-slate-200/90 rounded-xl p-2 shadow-2xs flex-1 flex flex-col justify-center space-y-1">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-[11px] font-black text-slate-900 tracking-tight">工作区模块</h2>
-                    <button
-                      type="button"
-                      onClick={() => setActiveDrawer('info')}
-                      className="text-[10px] font-bold text-indigo-600 flex items-center gap-0.5 cursor-pointer hover:text-indigo-700"
-                    >
-                      <span>管理</span>
-                      <ChevronRight className="w-2.5 h-2.5" />
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-1 flex-1 items-stretch">
-                    {/* Module 1: 剧本 */}
-                    <button
-                      id="ws-module-scenarios"
-                      type="button"
-                      onClick={() => setActiveNavTab('scenarios')}
-                      className="p-1.5 rounded-lg bg-slate-50/80 hover:bg-purple-50/50 border border-slate-100 hover:border-purple-200 transition text-left flex flex-col justify-between cursor-pointer active:scale-98 group"
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <div className="w-5 h-5 rounded-md bg-purple-50 border border-purple-100 text-purple-600 flex items-center justify-center shrink-0">
-                          <BookOpen className="w-2.5 h-2.5" />
-                        </div>
-                        <ChevronRight className="w-2.5 h-2.5 text-slate-300 group-hover:text-purple-600 transition-colors" />
-                      </div>
-                      <div className="mt-0.5 min-w-0">
-                        <div className="font-bold text-[10px] text-slate-900 truncate">剧本</div>
-                        <div className="text-[9px] text-slate-400 font-medium truncate">2 个剧本</div>
-                      </div>
-                    </button>
-
-                    {/* Module 2: 战报大事记 */}
-                    <button
-                      id="ws-module-events"
-                      type="button"
-                      onClick={() => setActiveNavTab('events')}
-                      className="p-1.5 rounded-lg bg-slate-50/80 hover:bg-rose-50/50 border border-slate-100 hover:border-rose-200 transition text-left flex flex-col justify-between cursor-pointer active:scale-98 group"
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <div className="w-5 h-5 rounded-md bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center shrink-0">
-                          <Flame className="w-2.5 h-2.5" />
-                        </div>
-                        <ChevronRight className="w-2.5 h-2.5 text-slate-300 group-hover:text-rose-600 transition-colors" />
-                      </div>
-                      <div className="mt-0.5 min-w-0">
-                        <div className="font-bold text-[10px] text-slate-900 truncate">战报大事记</div>
-                        <div className="text-[9px] text-slate-400 font-medium truncate">
-                          {activeChronicles.length} 条战报
-                        </div>
-                      </div>
-                    </button>
-
-                    {/* Module 3: 国家 */}
-                    <button
-                      id="ws-module-nations"
-                      type="button"
-                      onClick={() => setActiveNavTab('nations')}
-                      className="p-1.5 rounded-lg bg-slate-50/80 hover:bg-blue-50/50 border border-slate-100 hover:border-blue-200 transition text-left flex flex-col justify-between cursor-pointer active:scale-98 group"
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <div className="w-5 h-5 rounded-md bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                          <Flag className="w-2.5 h-2.5" />
-                        </div>
-                        <ChevronRight className="w-2.5 h-2.5 text-slate-300 group-hover:text-blue-600 transition-colors" />
-                      </div>
-                      <div className="mt-0.5 min-w-0">
-                        <div className="font-bold text-[10px] text-slate-900 truncate">国家</div>
-                        <div className="text-[9px] text-slate-400 font-medium truncate">193 个国家</div>
-                      </div>
-                    </button>
-
-                    {/* Module 4: 规则 */}
-                    <button
-                      id="ws-module-rules"
-                      type="button"
-                      onClick={() => setActiveNavTab('rules')}
-                      className="p-1.5 rounded-lg bg-slate-50/80 hover:bg-amber-50/50 border border-slate-100 hover:border-amber-200 transition text-left flex flex-col justify-between cursor-pointer active:scale-98 group"
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <div className="w-5 h-5 rounded-md bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center shrink-0">
-                          <Shield className="w-2.5 h-2.5" />
-                        </div>
-                        <ChevronRight className="w-2.5 h-2.5 text-slate-300 group-hover:text-amber-600 transition-colors" />
-                      </div>
-                      <div className="mt-0.5 min-w-0">
-                        <div className="font-bold text-[10px] text-slate-900 truncate">规则</div>
-                        <div className="text-[9px] text-slate-400 font-medium truncate">8 条规则</div>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 2.5 Micro Chronicle Timeline Pulse */}
-                <div className="bg-white border border-slate-200/90 rounded-xl p-2 shadow-2xs space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1 min-w-0">
-                      <Flame className="w-3 h-3 text-rose-500 animate-pulse shrink-0" />
-                      <span className="text-[11px] font-black text-slate-800 truncate">推演战报大事记</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setActiveNavTab('events')}
-                      className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 cursor-pointer shrink-0 flex items-center gap-0.5"
-                    >
-                      <span>大事记轴</span>
-                      <ChevronRight className="w-2.5 h-2.5" />
-                    </button>
-                  </div>
-
-                  <div className="space-y-1">
-                    {(activeChronicles.length > 0
-                      ? activeChronicles.slice(0, 2)
-                      : [
-                          { id: 'def_c1', year: '1939.09', title: '突入边境要塞群，主力部队完成合围', tensionChange: '+20%' },
-                          { id: 'def_c2', year: '1939.08', title: '苏德互不侵犯条约签署，东欧局势突变', tensionChange: '+10%' },
-                        ]
-                    ).map((item) => (
-                      <div
-                        key={item.id}
-                        onClick={() => setActiveNavTab('events')}
-                        className="p-1.5 rounded-lg bg-slate-50/90 hover:bg-indigo-50/60 border border-slate-100 hover:border-indigo-200 transition cursor-pointer text-left group"
-                      >
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-slate-900 text-white shrink-0">
-                            {item.year}
-                          </span>
-                          {item.tensionChange && item.tensionChange !== '0%' && (
-                            <span className="text-[9px] font-bold text-rose-600 font-mono">
-                              {item.tensionChange}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[10px] font-bold text-slate-800 line-clamp-1 mt-0.5 group-hover:text-indigo-600 transition-colors">
-                          {item.title}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 3. Bottom Quick Actions Strip */}
-                <div className="bg-white border border-slate-200/90 rounded-xl p-1.5 shadow-2xs flex items-center justify-between gap-1">
-                  <button
-                    type="button"
-                    onClick={handleOpenCreationWizard}
-                    className="flex-1 py-1 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold transition cursor-pointer active:scale-95 flex items-center justify-center gap-1 shadow-xs"
-                  >
-                    <Plus className="w-3 h-3 text-emerald-400" />
-                    <span>分步新建沙盘</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(window.location.href);
-                      showToast('已复制工作区直达链接');
-                    }}
-                    className="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-[10px] font-bold transition cursor-pointer active:scale-95 flex items-center gap-0.5"
-                    title="分享沙盘"
-                  >
-                    <Share2 className="w-3 h-3 text-blue-600" />
-                    <span>分享</span>
-                  </button>
-                </div>
-              </aside>
-            </div>
-
-            {/* Mobile Layout (< sm): Seamless fitting scroll view with compact centered card */}
-            <div className="sm:hidden h-full overflow-y-auto space-y-2 pb-20">
-              {/* Mobile Hero Map (expanded height) */}
-              <section
-                aria-label="核心地图区域"
-                className="w-full h-[58vh] min-h-[340px] rounded-2xl overflow-hidden border border-slate-200/90 shadow-2xs relative bg-slate-100"
-              >
-                <WorldMap
-                  nations={activeNations}
-                  myNation={myNation}
-                  onSelectNation={onSelectNation}
-                  onOpenDiplomacy={onOpenDiplomacy}
-                  onToggleFullscreen={handleEnterFullscreenMap}
-                  isFullscreen={isFullscreenMap}
-                />
-              </section>
-
-              {/* 2x2 Module Cards (constrained max width, slim and compact) */}
-              <section
-                aria-label="工作区功能模块"
-                className="w-full max-w-[340px] mx-auto bg-white border border-slate-200/90 rounded-xl p-3 shadow-2xs space-y-2"
-              >
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xs font-black text-slate-900 tracking-tight">工作区模块</h2>
-                  <button
-                    type="button"
-                    onClick={() => setActiveDrawer('info')}
-                    className="text-xs font-bold text-indigo-600 flex items-center gap-0.5"
-                  >
-                    <span>管理</span>
-                    <ChevronRight className="w-3 h-3" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setActiveNavTab('scenarios')}
-                    className="p-2 rounded-lg bg-slate-50/80 border border-slate-100 text-left flex items-start gap-1.5 active:scale-98"
-                  >
-                    <div className="w-6 h-6 rounded-md bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                      <BookOpen className="w-3 h-3" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="font-bold text-[11px] text-slate-900">剧本</div>
-                      <div className="text-[9px] text-slate-400">2 个剧本</div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setActiveNavTab('events')}
-                    className="p-2 rounded-lg bg-slate-50/80 border border-slate-100 text-left flex items-start gap-1.5 active:scale-98"
-                  >
-                    <div className="w-6 h-6 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-                      <Flame className="w-3 h-3" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="font-bold text-[11px] text-slate-900">战报大事记</div>
-                      <div className="text-[9px] text-slate-400">{activeChronicles.length} 条编年战报</div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setActiveNavTab('nations')}
-                    className="p-2 rounded-lg bg-slate-50/80 border border-slate-100 text-left flex items-start gap-1.5 active:scale-98"
-                  >
-                    <div className="w-6 h-6 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                      <Flag className="w-3 h-3" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="font-bold text-[11px] text-slate-900">国家</div>
-                      <div className="text-[9px] text-slate-400">193 个国家</div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setActiveNavTab('rules')}
-                    className="p-2 rounded-lg bg-slate-50/80 border border-slate-100 text-left flex items-start gap-1.5 active:scale-98"
-                  >
-                    <div className="w-6 h-6 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                      <Shield className="w-3 h-3" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="font-bold text-[11px] text-slate-900">规则</div>
-                      <div className="text-[9px] text-slate-400">8 条规则</div>
-                    </div>
-                  </button>
-                </div>
-              </section>
-            </div>
-          </div>
-        )}
-
-        {/* VIEW 2: 地图 (MAP) - Full Viewport Interactive Map */}
-        {activeNavTab === 'map' && (
-          <div className="h-full w-full rounded-2xl overflow-hidden border border-slate-200/90 shadow-2xs relative bg-slate-100">
-            <WorldMap
-              nations={activeNations}
-              myNation={myNation}
-              onSelectNation={onSelectNation}
-              onOpenDiplomacy={onOpenDiplomacy}
-              onToggleFullscreen={isFullscreenMap ? handleExitFullscreenMap : handleEnterFullscreenMap}
-              isFullscreen={isFullscreenMap}
-            />
-          </div>
-        )}
-
-        {/* VIEW 3: 剧本 (SCENARIOS) */}
-        {activeNavTab === 'scenarios' && (
-          <div className="h-full overflow-y-auto max-w-5xl mx-auto p-1 pb-16">
-            <WorkspaceScenariosTab
-              activeWorkspace={activeWs}
-              onSelectScenario={(scName) => {
-                showToast(`已成功载入剧本：${scName}`);
-              }}
-            />
-          </div>
-        )}
-
-        {/* VIEW 4: 推演战报大事记 (EVENTS & CHRONICLES TIMELINE) */}
-        {activeNavTab === 'events' && (
-          <div className="h-full overflow-y-auto max-w-5xl mx-auto p-1 pb-16">
-            <WorkspaceTimelineTab
-              workspace={activeWs}
-              onOpenCommentWithTag={(tag) => {
-                handleInsertTopicTag(tag);
-                setActiveDrawer('comments');
-              }}
-              showToast={showToast}
-            />
-          </div>
-        )}
-
-        {/* VIEW 5: 国家 (NATIONS) */}
-        {activeNavTab === 'nations' && (
-          <div className="h-full overflow-y-auto max-w-5xl mx-auto p-1 pb-16">
-            <WorkspaceNationsTab />
-          </div>
-        )}
-
-        {/* VIEW 6: 规则 (RULES) */}
-        {activeNavTab === 'rules' && (
-          <div className="h-full overflow-y-auto max-w-5xl mx-auto p-1 pb-16">
-            <WorkspaceRulesTab />
-          </div>
-        )}
-      </main>
-
-      {/* 3. DRAWERS & MODALS (切换工作区 / 新建 / 留言板) */}
-      <AnimatePresence>
-        {activeDrawer && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 select-none">
-            {/* Backdrop */}
+        {/* 展开的垂直工具箱 */}
+        <AnimatePresence>
+          {isMapToolsExpanded && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setActiveDrawer(null)}
-              className="absolute inset-0 bg-slate-950/40 backdrop-blur-xs cursor-pointer"
-            />
-
-            {/* Bottom Sheet / Modal Card */}
-            <motion.div
-              initial={{ y: '100%', opacity: 0.8 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: '100%', opacity: 0.8 }}
-              transition={{ type: 'spring', damping: 30, stiffness: 350 }}
-              className={`relative w-full ${
-                activeDrawer === 'comments' ? 'max-w-xl' : 'max-w-lg'
-              } bg-white border-t sm:border border-slate-200 rounded-t-3xl sm:rounded-2xl shadow-xl overflow-hidden max-h-[88vh] flex flex-col z-10`}
+              initial={{ opacity: 0, scale: 0.95, y: -4 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -4 }}
+              className="w-36 bg-white/98 backdrop-blur-xl border border-slate-200/90 rounded-2xl shadow-2xl p-1.5 flex flex-col gap-1 text-xs text-slate-700"
             >
-              {/* Drawer Header */}
-              <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
-                <div className="flex items-center gap-2">
-                  {activeDrawer === 'info' && (
-                    <FolderGit2 className="w-4 h-4 text-indigo-600" />
-                  )}
-                  {activeDrawer === 'comments' && (
-                    <MessageSquare className="w-4 h-4 text-indigo-600" />
-                  )}
-                  {activeDrawer === 'create' && (
-                    <Plus className="w-4 h-4 text-emerald-600" />
-                  )}
-                  {activeDrawer === 'edit' && (
-                    <SlidersHorizontal className="w-4 h-4 text-indigo-600" />
-                  )}
+              <button
+                type="button"
+                onClick={handleDownloadPureMapPng}
+                disabled={isExportingMap}
+                className="w-full px-2.5 py-1.5 rounded-xl hover:bg-slate-100 flex items-center gap-2 transition cursor-pointer text-left font-medium text-slate-800 disabled:opacity-50"
+                title="下载当前视角下的无UI纯净世界地图 (.png)"
+              >
+                <Download className="w-3.5 h-3.5 text-slate-600" />
+                <span>{isExportingMap ? '导出中...' : '下载纯净地图'}</span>
+              </button>
 
-                  <h3 className="text-sm font-black text-slate-900">
-                    {activeDrawer === 'info' && '推演工作区库'}
-                    {activeDrawer === 'comments' && '推演研判留言板'}
-                    {activeDrawer === 'create' && '新建推演工作区'}
-                    {activeDrawer === 'edit' && '编辑工作区设置'}
-                  </h3>
+              <div className="w-full h-px bg-slate-100 my-0.5" />
 
-                  {activeDrawer === 'comments' && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">
-                      {(activeWs?.comments || []).length} 条研判
-                    </span>
-                  )}
-                </div>
+              <button
+                type="button"
+                onClick={handleMapZoomIn}
+                className="w-full px-2.5 py-1.5 rounded-xl hover:bg-slate-100 flex items-center gap-2 transition cursor-pointer text-left"
+              >
+                <ZoomIn className="w-3.5 h-3.5 text-slate-500" />
+                <span>放大</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleMapZoomOut}
+                className="w-full px-2.5 py-1.5 rounded-xl hover:bg-slate-100 flex items-center gap-2 transition cursor-pointer text-left"
+              >
+                <ZoomOut className="w-3.5 h-3.5 text-slate-500" />
+                <span>缩小</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleMapReset}
+                className="w-full px-2.5 py-1.5 rounded-xl hover:bg-slate-100 flex items-center gap-2 transition cursor-pointer text-left"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                <span>重置视角</span>
+              </button>
 
+              <div className="w-full h-px bg-slate-100 my-0.5" />
+
+              <button
+                type="button"
+                onClick={() => setIsLayerModalOpen(true)}
+                className="w-full px-2.5 py-1.5 rounded-xl hover:bg-slate-100 flex items-center gap-2 transition cursor-pointer text-left"
+              >
+                <Layers className="w-3.5 h-3.5 text-slate-500" />
+                <span>地图图层</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !isSetCapitalMode;
+                  setIsSetCapitalMode(next);
+                  if (next) {
+                    setIsBoxSelectMode(false);
+                    showToast(`已开启定都模式：请在地图上点击省份设为【${selectedNation?.name || '当前国家'}】的法定都城`);
+                  } else {
+                    showToast('已退出定都模式');
+                  }
+                }}
+                className={`w-full px-2.5 py-1.5 rounded-xl flex items-center gap-2 transition cursor-pointer text-left ${
+                  isSetCapitalMode
+                    ? 'bg-[#F0ECFF] text-[#6C4FF6] font-bold'
+                    : 'hover:bg-slate-100 text-slate-700'
+                }`}
+              >
+                <Landmark className="w-3.5 h-3.5" />
+                <span>定都模式</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen?.().catch(() => {});
+                    setIsFullscreen(true);
+                  } else {
+                    document.exitFullscreen?.().catch(() => {});
+                    setIsFullscreen(false);
+                  }
+                }}
+                className="w-full px-2.5 py-1.5 rounded-xl hover:bg-slate-100 flex items-center gap-2 transition cursor-pointer text-left"
+              >
+                {isFullscreen ? <Minimize2 className="w-3.5 h-3.5 text-slate-500" /> : <Maximize2 className="w-3.5 h-3.5 text-slate-500" />}
+                <span>{isFullscreen ? '退出全屏' : '全屏'}</span>
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* 🌟 4. 地图图层悬浮弹窗（单选5模式 + 复选4项） */}
+      <AnimatePresence>
+        {isLayerModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/20 backdrop-blur-2xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-xs bg-white/98 backdrop-blur-xl border border-slate-200/90 rounded-3xl shadow-2xl p-4 text-slate-800"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 className="font-bold text-sm text-slate-900">地图图层</h3>
                 <button
                   type="button"
-                  onClick={() => setActiveDrawer(null)}
-                  className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition cursor-pointer"
-                  title="关闭"
+                  onClick={() => setIsLayerModalOpen(false)}
+                  className="w-6 h-6 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Drawer Content */}
-              <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4">
-                {/* DRAWER 1: INFO & SWITCH WORKSPACES */}
-                {activeDrawer === 'info' && (
-                  <div className="space-y-3.5">
-                    <div className="flex items-center justify-between text-xs text-slate-500">
-                      <span className="font-bold">
-                        所有沙盘工作区（{workspaces.length}）
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleOpenCreationWizard();
-                          setActiveDrawer(null);
-                        }}
-                        className="text-indigo-600 font-bold flex items-center gap-1 hover:underline cursor-pointer"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>分步新建向导</span>
-                      </button>
-                    </div>
-
-                    <div className="space-y-2.5">
-                      {workspaces.map((ws) => {
-                        const isActive = ws.id === activeWorkspaceId;
-                        const isOwner = user?.id === ws.creatorId || isAdmin;
-                        return (
-                          <div
-                            key={ws.id}
-                            onClick={() => handleSelectWorkspace(ws)}
-                            className={`p-3.5 rounded-xl border transition cursor-pointer ${
-                              isActive
-                                ? 'bg-indigo-50/50 border-indigo-300 ring-1 ring-indigo-200'
-                                : 'bg-white border-slate-200/90 hover:border-slate-300 shadow-2xs'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-2 mb-1">
-                              <div className="flex items-center gap-2 min-w-0">
-                                {(() => {
-                                  const TotemComp = getWorkspaceTotemIcon(ws.totemIcon);
-                                  return (
-                                    <span className="w-5 h-5 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                                      <TotemComp className="w-3.5 h-3.5" />
-                                    </span>
-                                  );
-                                })()}
-                                <span className="font-bold text-xs text-slate-900 truncate">
-                                  {ws.name}
-                                </span>
-                                {ws.scenarioType && (
-                                  <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-50 text-blue-700 shrink-0">
-                                    {ws.scenarioType}
-                                  </span>
-                                )}
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[10px] font-medium">
-                                  {ws.era}
-                                </span>
-                                {isActive ? (
-                                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100 px-1.5 py-0.5 rounded">
-                                    当前使用
-                                  </span>
-                                ) : (
-                                  <span className="text-[10px] text-slate-400">
-                                    点击切换
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            {ws.description && (
-                              <p className="text-xs text-slate-500 line-clamp-1 mb-2">
-                                {ws.description}
-                              </p>
-                            )}
-
-                            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-                              <span>创作者：{ws.creatorName}</span>
-                              <div className="flex items-center gap-2">
-                                <span>战报 {(ws.chronicles || []).length || 3}</span>
-                                <span>点赞 {ws.likesCount || 0}</span>
-                                <span>研讨 {ws.comments?.length || 0}</span>
-                                {isOwner && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditingWorkspace(ws);
-                                      setActiveDrawer('edit');
-                                    }}
-                                    className="px-2 py-0.5 text-xs text-slate-500 hover:text-indigo-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded font-bold transition cursor-pointer"
-                                  >
-                                    编辑
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* DRAWER 2: COMMENTS (推演研判留言板) */}
-                {activeDrawer === 'comments' && (
-                  <div className="space-y-3.5">
-                    {/* 1. Header Atmosphere & Identity Status */}
-                    <div className="p-3 bg-gradient-to-r from-indigo-50/90 via-slate-50 to-purple-50/60 border border-indigo-100/80 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                          <MessageSquare className="w-4 h-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-black text-slate-900 text-xs">
-                              地缘战略研讨区
-                            </span>
-                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-indigo-100/80 text-indigo-700">
-                              共 {(activeWs?.comments || []).length} 条研判
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
-                            探讨欧亚战役演进、国界划定与地缘同盟策略
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="shrink-0">
-                        {isAuthenticated ? (
-                          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/95 border border-indigo-200 rounded-lg text-[11px] font-bold text-indigo-700 shadow-2xs">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                            <span className="truncate max-w-[120px]">
-                              {user?.douyinName || user?.username || '已认证领主'}
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1 px-2 py-1 bg-amber-50 border border-amber-200/80 rounded-lg text-[10px] text-amber-800 font-medium">
-                            <span>免登录访客</span>
-                            <span className="font-bold text-indigo-600">
-                              ({workspaceService.getGuestCommentCount()}/3 条)
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                onOpenAuth('register');
-                                setActiveDrawer(null);
-                              }}
-                              className="ml-1 text-indigo-600 hover:underline font-bold cursor-pointer"
-                            >
-                              注册解锁
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* 2. Quick Strategic Topic Tags */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-                      <span className="text-[10px] text-slate-400 font-bold shrink-0 flex items-center gap-0.5">
-                        <Sparkles className="w-3 h-3 text-amber-500" />
-                        <span>研讨标签:</span>
-                      </span>
-                      {[
-                        '战略研判',
-                        '历史复盘',
-                        '外交斡旋',
-                        '战况前线',
-                        '规则建议',
-                      ].map((tag) => (
-                        <button
-                          key={tag}
-                          type="button"
-                          onClick={() => handleInsertTopicTag(tag)}
-                          className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 text-slate-600 transition border border-slate-200/80 shrink-0 cursor-pointer active:scale-95"
-                        >
-                          {tag}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* 3. Comment Error Alert */}
-                    {commentError && (
-                      <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium flex items-center justify-between">
-                        <span>{commentError}</span>
-                        <button
-                          type="button"
-                          onClick={() => setCommentError(null)}
-                          className="text-rose-500 hover:text-rose-700 p-0.5 cursor-pointer"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
-
-                    {/* 4. Interactive Input Box */}
-                    <form
-                      onSubmit={handleSendComment}
-                      className="bg-white border border-slate-200/90 rounded-xl p-3 shadow-2xs space-y-2 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100/80 transition"
+              {/* 单选模式列表 */}
+              <div className="py-2.5 space-y-1">
+                {[
+                  { id: 'political', label: '政治（默认）' },
+                  { id: 'terrain', label: '地形' },
+                  { id: 'population', label: '人口' },
+                  { id: 'industrial', label: '工业' },
+                  { id: 'resources', label: '区域' },
+                ].map((item) => {
+                  const isSelected = mapMode === item.id;
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => {
+                        setMapMode(item.id as any);
+                        window.dispatchEvent(new CustomEvent('map-set-layer', { detail: { mode: item.id, settings: layerSettings } }));
+                        showToast(`已切换至【${item.label}】图层`);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-xl flex items-center gap-2.5 cursor-pointer text-xs transition ${
+                        isSelected ? 'bg-slate-100/90 text-slate-900 font-semibold' : 'hover:bg-slate-50 text-slate-700'
+                      }`}
                     >
-                      {!isAuthenticated && (
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50/80 rounded-lg border border-slate-200/80">
-                          <User className="w-3.5 h-3.5 text-slate-400" />
-                          <input
-                            type="text"
-                            value={guestName}
-                            onChange={(e) => setGuestName(e.target.value)}
-                            placeholder="您的推演代号/称谓（选填，默认：访客探员）"
-                            className="w-full text-xs bg-transparent border-none text-slate-800 focus:outline-hidden font-medium placeholder-slate-400"
-                          />
-                        </div>
-                      )}
-
-                      <div className="relative">
-                        <textarea
-                          ref={textareaRef}
-                          rows={3}
-                          required
-                          maxLength={300}
-                          value={commentText}
-                          onChange={(e) => setCommentText(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                              e.preventDefault();
-                              handleSendComment(e);
-                            }
-                          }}
-                          placeholder="输入您的战略洞见、战役推演部署或地缘博弈建言... (按 Ctrl+Enter 快捷发送)"
-                          className="w-full text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden resize-none leading-relaxed p-0.5"
-                        />
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
+                        isSelected ? 'border-slate-900 bg-white' : 'border-slate-300 bg-white'
+                      }`}>
+                        {isSelected && <div className="w-2 h-2 rounded-full bg-slate-900" />}
                       </div>
-
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
-                        <div className="flex items-center gap-1.5 text-slate-400 text-[10px]">
-                          <span>{commentText.length}/300 字</span>
-                          <span className="hidden sm:inline">·</span>
-                          <span className="hidden sm:inline">Ctrl+Enter 快捷发送</span>
-                        </div>
-
-                        <div className="flex items-center gap-1.5">
-                          {commentText && (
-                            <button
-                              type="button"
-                              onClick={() => setCommentText('')}
-                              className="px-2 py-1 text-slate-400 hover:text-slate-600 text-xs font-medium cursor-pointer"
-                            >
-                              清空
-                            </button>
-                          )}
-                          <button
-                            id="ws-drawer-comment-submit"
-                            type="submit"
-                            disabled={!commentText.trim()}
-                            className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-bold rounded-lg shadow-xs transition cursor-pointer flex items-center gap-1 active:scale-95 disabled:pointer-events-none"
-                          >
-                            <Send className="w-3 h-3" />
-                            <span>发表战论</span>
-                          </button>
-                        </div>
-                      </div>
-                    </form>
-
-                    {/* 5. Comments Stream */}
-                    <div className="space-y-2.5 pt-1">
-                      <div className="flex items-center justify-between px-0.5 text-xs">
-                        <div className="flex items-center gap-1.5 font-black text-slate-800">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          <span>研讨发言流</span>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            ({(activeWs?.comments || []).length})
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2.5 max-h-[380px] sm:max-h-[420px] overflow-y-auto pr-1">
-                        {(activeWs?.comments || []).length === 0 ? (
-                          <div className="text-center py-8 px-4 bg-slate-50/60 rounded-xl border border-dashed border-slate-200 text-slate-400 space-y-2">
-                            <div className="w-10 h-10 mx-auto rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center">
-                              <MessageSquare className="w-5 h-5" />
-                            </div>
-                            <div className="font-bold text-slate-700 text-xs">
-                              暂无推演研判记录
-                            </div>
-                            <p className="text-[11px] max-w-xs mx-auto text-slate-400">
-                              成为第一位对当前沙盘发表战略剖析的领主，开启天下推演大局！
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setCommentText('愿与诸位推演领主共商地缘变局，共谋破局之道！');
-                                setTimeout(() => textareaRef.current?.focus(), 50);
-                              }}
-                              className="text-[11px] font-bold text-indigo-600 hover:underline cursor-pointer pt-1 inline-block"
-                            >
-                              一键填入探讨问候语
-                            </button>
-                          </div>
-                        ) : (
-                          (activeWs?.comments || []).map((cmt) => {
-                            const isAuthor =
-                              cmt.authorName === activeWs?.creatorName ||
-                              cmt.authorName === '创联世界官方';
-                            const isLiked = !!likedCommentIds[cmt.id];
-                            const extraLikes = commentExtraLikes[cmt.id] || 0;
-                            const totalCommentLikes = (isLiked ? 1 : 0) + extraLikes;
-
-                            return (
-                              <div
-                                key={cmt.id}
-                                className="p-3 bg-white border border-slate-200/90 rounded-xl text-xs space-y-2 hover:border-indigo-200 hover:shadow-2xs transition group"
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <div
-                                      className="w-6 h-6 rounded-full flex items-center justify-center font-bold text-[11px] text-white shrink-0 shadow-2xs"
-                                      style={{
-                                        backgroundColor: cmt.authorColor || '#6366f1',
-                                      }}
-                                    >
-                                      {cmt.authorName.charAt(0).toUpperCase()}
-                                    </div>
-                                    <div className="flex items-center gap-1.5 min-w-0">
-                                      <span className="font-bold text-slate-900 truncate max-w-[120px]">
-                                        {cmt.authorName}
-                                      </span>
-                                      {isAuthor && (
-                                        <span className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
-                                          沙盘作者
-                                        </span>
-                                      )}
-                                      {!isAuthor && !cmt.isGuest && (
-                                        <span className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
-                                          推演领主
-                                        </span>
-                                      )}
-                                      {cmt.isGuest && (
-                                        <span className="text-[9px] px-1.5 py-0.2 rounded font-normal bg-slate-100 text-slate-500 shrink-0">
-                                          访客
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  <span className="text-[10px] text-slate-400 font-mono shrink-0">
-                                    {formatCommentTime(cmt.createdAt)}
-                                  </span>
-                                </div>
-
-                                <p className="text-slate-700 text-xs leading-relaxed pl-8 font-normal whitespace-pre-wrap">
-                                  {cmt.content}
-                                </p>
-
-                                <div className="flex items-center justify-end gap-3 pl-8 pt-1 text-[11px] text-slate-400">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleToggleCommentLike(cmt.id)}
-                                    className={`flex items-center gap-1 text-[10px] font-bold transition cursor-pointer hover:text-pink-600 ${
-                                      isLiked ? 'text-pink-600' : 'text-slate-400'
-                                    }`}
-                                    title="赞同发言"
-                                  >
-                                    <Heart
-                                      className={`w-3 h-3 ${
-                                        isLiked ? 'fill-pink-500 text-pink-500' : ''
-                                      }`}
-                                    />
-                                    <span>{totalCommentLikes > 0 ? totalCommentLikes : '赞'}</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => handleReplyToComment(cmt.authorName)}
-                                    className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-indigo-600 transition cursor-pointer"
-                                    title="回复此条"
-                                  >
-                                    <CornerDownRight className="w-3 h-3" />
-                                    <span>回复</span>
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
+                      <span className={isSelected ? 'font-bold text-slate-900' : 'text-slate-700'}>
+                        {item.label}
+                      </span>
                     </div>
-                  </div>
-                )}
+                  );
+                })}
+              </div>
 
-                {/* DRAWER 3: CREATE WORKSPACE */}
-                {activeDrawer === 'create' && (
-                  <div>
-                    {!isCreator ? (
-                      <div className="py-6 px-3 text-center space-y-3">
-                        <div className="w-12 h-12 mx-auto rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center">
-                          <Shield className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-black text-slate-900">
-                            工作区是申请后创建的
-                          </h4>
-                          <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                            普通用户可自由参与所有公开工作区的沙盘推演与留言；独立创建全新推演剧本工作区需具备创作者身份。
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onOpenAuth('register');
-                            setActiveDrawer(null);
-                          }}
-                          className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer inline-flex items-center gap-1.5"
-                        >
-                          <Sparkles className="w-4 h-4" />
-                          <span>注册创作者账户（免申请）</span>
-                        </button>
+              <div className="w-full h-px bg-slate-100 my-1" />
+
+              {/* 复选开关 */}
+              <div className="pt-2 space-y-1 text-xs">
+                {[
+                  { key: 'showCountryName', label: '显示国家名称' },
+                  { key: 'showProvinceName', label: '显示省份名称' },
+                  { key: 'showGrid', label: '显示网格' },
+                  { key: 'showLegend', label: '显示图例' },
+                ].map((item) => {
+                  const checked = Boolean((layerSettings as any)[item.key]);
+                  return (
+                    <div
+                      key={item.key}
+                      onClick={() => {
+                        const nextSettings = {
+                          ...layerSettings,
+                          [item.key]: !checked,
+                        };
+                        setLayerSettings(nextSettings);
+                        window.dispatchEvent(new CustomEvent('map-set-layer-settings', { detail: nextSettings }));
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer transition"
+                    >
+                      <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition-colors ${
+                        checked ? 'bg-slate-900 border-slate-900 text-white shadow-2xs' : 'border-slate-300 bg-white hover:border-slate-400'
+                      }`}>
+                        {checked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
                       </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="p-3.5 bg-gradient-to-r from-indigo-50 via-purple-50 to-blue-50 border border-indigo-200/90 rounded-2xl flex items-center justify-between gap-3 shadow-2xs">
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <Sparkles className="w-4 h-4 text-indigo-600" />
-                              <h4 className="text-xs font-black text-slate-900">推荐：分步创世向导 (3步打造定制沙盘)</h4>
-                            </div>
-                            <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
-                              包含预设历史模版、战备税率、阵营划分与沙盘专属图腾，打造沉浸式大战略推演。
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              handleOpenCreationWizard();
-                              setActiveDrawer(null);
-                            }}
-                            className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shrink-0 shadow-xs transition active:scale-95 cursor-pointer flex items-center gap-1"
-                          >
-                            <span>启动向导</span>
-                            <ChevronRight className="w-3 h-3" />
-                          </button>
-                        </div>
-
-                        <div className="flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-wider py-0.5">
-                          <div className="flex-1 h-px bg-slate-200" />
-                          <span>或使用简易快速表单</span>
-                          <div className="flex-1 h-px bg-slate-200" />
-                        </div>
-
-                        <form onSubmit={handleCreateWorkspace} className="space-y-3">
-                        <div>
-                          <label className="block text-xs font-bold text-slate-700 mb-1">
-                            剧本名称 <span className="text-rose-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            value={newName}
-                            onChange={(e) => setNewName(e.target.value)}
-                            placeholder="如：粉陆纪元·开天辟地"
-                            className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-indigo-600 transition"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-bold text-slate-700 mb-1">
-                            剧本年代 <span className="text-rose-500">*</span>
-                          </label>
-                          <div className="grid grid-cols-3 gap-1.5">
-                            {PRESET_ERAS.map((era) => (
-                              <button
-                                key={era}
-                                type="button"
-                                onClick={() => setNewEra(era)}
-                                className={`py-1.5 px-2 text-xs font-bold rounded-lg border transition truncate ${
-                                  newEra === era
-                                    ? 'bg-indigo-600 text-white border-indigo-600'
-                                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                                }`}
-                              >
-                                {era}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-bold text-slate-700 mb-1">
-                            剧本性质
-                          </label>
-                          <div className="grid grid-cols-2 gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => setNewScenarioType('拟实')}
-                              className={`py-1.5 rounded-lg text-xs font-bold border transition ${
-                                newScenarioType === '拟实'
-                                  ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
-                                  : 'bg-white border-slate-200 text-slate-600'
-                              }`}
-                            >
-                              拟实 (历史地缘)
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setNewScenarioType('架空')}
-                              className={`py-1.5 rounded-lg text-xs font-bold border transition ${
-                                newScenarioType === '架空'
-                                  ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
-                                  : 'bg-white border-slate-200 text-slate-600'
-                              }`}
-                            >
-                              架空 (自设大陆)
-                            </button>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-bold text-slate-700 mb-1">
-                            剧本简介
-                          </label>
-                          <textarea
-                            rows={2}
-                            value={newDescription}
-                            onChange={(e) => setNewDescription(e.target.value)}
-                            className="w-full p-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-indigo-600 transition resize-none"
-                          />
-                        </div>
-
-                        <div className="pt-2 flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setActiveDrawer(null)}
-                            className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg"
-                          >
-                            取消
-                          </button>
-                          <button
-                            type="submit"
-                            className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-xs"
-                          >
-                            立即创建
-                          </button>
-                        </div>
-                      </form>
+                      <span className={checked ? 'text-slate-900 font-medium' : 'text-slate-700'}>{item.label}</span>
                     </div>
-                    )}
-                  </div>
-                )}
-
-                {/* DRAWER 4: EDIT WORKSPACE */}
-                {activeDrawer === 'edit' && editingWorkspace && (
-                  <form onSubmit={handleUpdateWorkspace} className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        工作区名称
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={editingWorkspace.name}
-                        onChange={(e) =>
-                          setEditingWorkspace({
-                            ...editingWorkspace,
-                            name: e.target.value,
-                          })
-                        }
-                        className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-indigo-600 transition"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        推演年代
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={editingWorkspace.era}
-                        onChange={(e) =>
-                          setEditingWorkspace({
-                            ...editingWorkspace,
-                            era: e.target.value,
-                          })
-                        }
-                        className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-indigo-600 transition"
-                      />
-                    </div>
-
-                    {/* 全屏地图推演设置 */}
-                    <div className="p-3 bg-gradient-to-br from-indigo-50/80 to-purple-50/50 border border-indigo-100 rounded-xl space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                          <Maximize2 className="w-3.5 h-3.5 text-indigo-600" />
-                          <span>全屏进入推演地图</span>
-                        </div>
-                        <span className="text-[10px] font-bold text-indigo-600 bg-white px-2 py-0.5 rounded-full border border-indigo-200/80">
-                          沉浸全景
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 leading-relaxed">
-                        开启全屏沉浸后，沙盘完全铺满屏幕并隐藏多余边框，适配触控双指缩放与大屏推演研判。
-                      </p>
-                      <div className="pt-1 flex items-center justify-between gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveDrawer(null);
-                            handleEnterFullscreenMap();
-                          }}
-                          className="flex-1 py-2 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
-                        >
-                          <Maximize2 className="w-3.5 h-3.5" />
-                          <span>立即全屏进入地图</span>
-                        </button>
-                      </div>
-                      <div className="flex items-center justify-between pt-1 border-t border-indigo-100/80">
-                        <label htmlFor="toggle-auto-fullscreen-map" className="text-xs font-bold text-slate-700 cursor-pointer">
-                          进入地图选项卡时自动全屏
-                        </label>
-                        <input
-                          id="toggle-auto-fullscreen-map"
-                          type="checkbox"
-                          checked={autoFullscreenMap}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setAutoFullscreenMap(checked);
-                            try {
-                              localStorage.setItem('ws_auto_fullscreen_map', String(checked));
-                            } catch {
-                              // ignore
-                            }
-                            showToast(checked ? '已开启：进入地图时自动全屏' : '已关闭：进入地图时自动全屏');
-                          }}
-                          className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="pt-2 flex items-center justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setActiveDrawer(null)}
-                        className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg"
-                      >
-                        取消
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-xs"
-                      >
-                        保存设置
-                      </button>
-                    </div>
-                  </form>
-                )}
+                  );
+                })}
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* 4. WORKSPACE CREATION WIZARD (分步创建向导) */}
-      <WorkspaceCreationWizard
-        isOpen={isCreationWizardOpen}
-        onClose={() => setIsCreationWizardOpen(false)}
-        isCreator={isCreator}
-        onOpenAuth={onOpenAuth}
-        user={user}
-        onSuccess={(createdWs) => {
-          setWorkspaces(workspaceService.getWorkspaces());
-          setActiveWorkspaceId(createdWs.id);
-          if (onWorkspaceSelected) onWorkspaceSelected(createdWs);
-          showToast(`已成功构筑并进入推演工作区：${createdWs.name}`);
+
+
+      {/* 🌟 5. 底部悬浮操作栏：居中极简药丸（单点、框选、新建国家） */}
+      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 pointer-events-auto select-none">
+        <div className="flex items-center gap-1.5 p-1.5 bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/90 shadow-2xl">
+          {/* 单点模式 */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsSetCapitalMode(false);
+              if (isBoxSelectMode) {
+                setIsBoxSelectMode(false);
+                showToast('已切换至单点划拨模式');
+              }
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap active:scale-95 ${
+              !isBoxSelectMode && !isSetCapitalMode
+                ? 'bg-[#F0ECFF] text-[#6C4FF6] border border-[#6C4FF6]/25 font-bold shadow-2xs'
+                : 'bg-transparent hover:bg-slate-100 text-slate-700 font-medium'
+            }`}
+          >
+            <MousePointer className="w-3.5 h-3.5" />
+            <span>单点</span>
+          </button>
+
+          {/* 框选模式 */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsSetCapitalMode(false);
+              if (!isBoxSelectMode) {
+                setIsBoxSelectMode(true);
+                showToast('已开启框选分配模式');
+              }
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap active:scale-95 ${
+              isBoxSelectMode
+                ? 'bg-[#6C4FF6] text-white font-bold shadow-2xs'
+                : 'bg-transparent hover:bg-slate-100 text-slate-700 font-medium'
+            }`}
+          >
+            <BoxSelect className="w-3.5 h-3.5" />
+            <span>框选</span>
+          </button>
+
+          <div className="w-px h-4 bg-slate-200 mx-0.5" />
+
+          {/* 新建国家按钮 */}
+          <button
+            type="button"
+            onClick={() => setIsQuickNationModalOpen(true)}
+            className="px-3.5 py-1.5 rounded-xl bg-[#6C4FF6] hover:bg-[#5737D9] text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap active:scale-95 shadow-xs"
+          >
+            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>新建国家</span>
+          </button>
+        </div>
+      </div>
+
+
+
+      {/* 🌟 7. 右侧国家详情档案抽屉 (Slide-in Drawer) */}
+      <AnimatePresence>
+        {isNationDetailOpen && detailNation && (
+          <div className="fixed inset-0 z-40 flex justify-end pointer-events-auto">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsNationDetailOpen(false)}
+              className="fixed inset-0 bg-slate-900/20 backdrop-blur-2xs"
+            />
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 26, stiffness: 280 }}
+              className="relative w-84 max-w-[85vw] h-full bg-white/98 backdrop-blur-2xl border-l border-slate-200/90 shadow-2xl flex flex-col z-10 text-slate-800"
+            >
+              {/* 头部：国旗、国名、修改与关闭 */}
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
+                  <div
+                    style={{ aspectRatio: getAspectRatioCSS(detailNation.flagRatio) }}
+                    className="h-6 max-w-11 rounded-md overflow-hidden bg-slate-100 border border-slate-200 shrink-0 shadow-2xs flex items-center justify-center"
+                  >
+                    <NationFlagDisplay
+                      flagUrl={detailNation.flagUrl}
+                      flagColor={detailNation.flagColor}
+                      name={detailNation.name}
+                      ratio={detailNation.flagRatio}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    {isRenamingNation && selectedNationId === detailNation.id ? (
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          value={renameNationInput}
+                          onChange={(e) => setRenameNationInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveRenameNation();
+                            if (e.key === 'Escape') setIsRenamingNation(false);
+                          }}
+                          autoFocus
+                          className="w-full h-6 px-1.5 text-xs font-bold bg-white border border-[#6C4FF6] rounded-md outline-none text-slate-900"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSaveRenameNation}
+                          className="p-1 rounded bg-[#6C4FF6] text-white hover:bg-[#5737D9] transition cursor-pointer shrink-0"
+                          title="确认修改"
+                        >
+                          <Check className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <h3 className="font-bold text-sm text-slate-900 truncate">{detailNation.name}</h3>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedNationId(detailNation.id);
+                            handleStartRenameNation();
+                          }}
+                          className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition cursor-pointer shrink-0"
+                          title="修改名称"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsNationDetailOpen(false)}
+                  className="w-7 h-7 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer transition shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* 核心指标统计 */}
+              <div className="p-4 border-b border-slate-100 grid grid-cols-3 gap-2 text-center bg-slate-50/50">
+                <div className="p-2 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
+                  <div className="text-[10px] text-slate-400 font-medium">省份数量</div>
+                  <div className="font-bold text-sm text-slate-800 mt-0.5">
+                    {detailNation.provinces?.length || 0}
+                  </div>
+                </div>
+                <div className="p-2 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
+                  <div className="text-[10px] text-slate-400 font-medium">都城</div>
+                  <div className="font-bold text-xs text-slate-800 mt-0.5 truncate">
+                    {detailNation.capital || '待勘定'}
+                  </div>
+                </div>
+                <div className="p-2 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
+                  <div className="text-[10px] text-slate-400 font-medium">总人口</div>
+                  <div className="font-bold text-xs text-slate-800 mt-0.5 truncate">
+                    {formatPopulation(calculateNationTotalPop(detailNation))}
+                  </div>
+                </div>
+              </div>
+
+              {/* 疆域代表色收纳器 */}
+              <div className="px-4 py-2.5 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-700">疆域代表色</span>
+                <TerritoryColorPicker
+                  color={detailNation.flagColor || '#3b82f6'}
+                  nationName={detailNation.name}
+                  onChange={(newColor) => handleUpdateNationColor(detailNation.id, newColor)}
+                  variant="pill"
+                  placement="bottom-end"
+                />
+              </div>
+
+              {/* 所属省份精简清单 */}
+              <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-bold text-xs text-slate-700">疆域领土清单</span>
+                  <span className="text-[11px] text-slate-400">
+                    {detailNation.provinces?.length || 0} 个省份
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  {detailNation.provinces?.map((prov, idx) => {
+                    const provId = typeof prov === 'string' ? prov : prov.id;
+                    const provName = typeof prov === 'string' ? prov : (prov.name || prov.id);
+                    const displayName = getProvinceChineseName(provName || provId);
+                    const isCapital = detailNation.capital === provName || detailNation.capital === provId;
+
+                    return (
+                      <div
+                        key={provId || idx}
+                        className="px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between text-xs"
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="font-medium text-slate-700 truncate">{displayName}</span>
+                          {provId && provId !== displayName && (
+                            <span className="text-[10px] text-slate-400 font-mono truncate">({provId})</span>
+                          )}
+                        </div>
+                        {isCapital && (
+                          <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200 text-[10px] font-bold shrink-0">
+                            都城
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {(!detailNation.provinces || detailNation.provinces.length === 0) && (
+                    <div className="py-8 text-center text-slate-400 text-xs">
+                      尚未分配任何省份疆域
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 底部危险操作区 */}
+              <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleClearNationProvinces(detailNation.id);
+                  }}
+                  className="w-full py-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 font-medium text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                  <span>清空疆域领土</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsNationDetailOpen(false);
+                    handleDeleteNation(detailNation.id);
+                  }}
+                  className="w-full py-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                  <span>解散该国家实体</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 🌟 核心新建国家弹窗 (QuickNationCreateModal)：支持 3:2 国旗、连续建国 */}
+      <QuickNationCreateModal
+        isOpen={isQuickNationModalOpen}
+        onClose={() => setIsQuickNationModalOpen(false)}
+        existingNations={workspaceNations}
+        onNationCreated={handleQuickNationCreated}
+        onDeleteNation={handleDeleteNation}
+        onProceedToTerritoryAllocation={() => {
+          setIsQuickNationModalOpen(false);
+          setActiveMode('territory');
+          showToast('已进入分配疆域模式，可在地图上点选或框选省份');
         }}
       />
 
-      {/* Floating Toast Message */}
+      {/* 移动端专属：侧栏国家完整列表抽屉 */}
       <AnimatePresence>
-        {toastMsg && (
+        {isMobileSidebarOpen && (
+          <div className="fixed inset-0 z-50 flex justify-end md:hidden bg-slate-900/40 backdrop-blur-xs">
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 280 }}
+              className="w-4/5 max-w-xs h-full bg-white border-l border-slate-200 shadow-2xl flex flex-col text-slate-800"
+            >
+              <div className="p-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-sm text-slate-900">国家实体管理</span>
+                  <span className="text-xs text-slate-500 font-mono">({workspaceNations.length})</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsMobileSidebarOpen(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-2 border-b border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileSidebarOpen(false);
+                    setIsQuickNationModalOpen(true);
+                  }}
+                  className="w-full py-2 rounded-xl bg-[#6C4FF6] text-white font-bold text-xs flex items-center justify-center gap-1 whitespace-nowrap shadow-xs"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>新建国家实体</span>
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-2 space-y-1.5 custom-scrollbar">
+                {workspaceNations.map((nation) => {
+                  const isSelected = nation.id === selectedNationId;
+                  return (
+                    <div
+                      key={nation.id}
+                      onClick={() => {
+                        setSelectedNationId(nation.id);
+                        setIsMobileSidebarOpen(false);
+                        setActiveMode('territory');
+                        showToast(`已切换至【${nation.name}】进行疆域划拨`);
+                      }}
+                      className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition ${
+                        isSelected
+                          ? 'bg-[#F0ECFF] border-[#6C4FF6] text-[#6C4FF6]'
+                          : 'bg-slate-50 border-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div
+                          style={{ aspectRatio: getAspectRatioCSS(nation.flagRatio) }}
+                          className="h-5 max-w-9 rounded-xs overflow-hidden border border-slate-200 shrink-0 flex items-center justify-center"
+                        >
+                          <NationFlagDisplay
+                            flagUrl={nation.flagUrl}
+                            flagColor={nation.flagColor}
+                            name={nation.name}
+                            ratio={nation.flagRatio}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-xs text-slate-900 truncate">{nation.name}</h4>
+                          <span className="text-[10px] text-slate-500 truncate block">
+                            {nation.nationType || nation.regime} · {nation.provinces?.length || 0} 省
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteNation(nation.id);
+                        }}
+                        className="p-1 text-slate-400 hover:text-rose-600 transition"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 🌟 国家排行弹窗 (Nation Ranking Modal) */}
+      <AnimatePresence>
+        {isRankingModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fadeIn">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="w-full max-w-[420px] bg-white border border-slate-200/90 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] text-slate-800"
+            >
+              {/* 弹窗头部 */}
+              <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-600 shadow-2xs">
+                    <Trophy className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-xs sm:text-sm text-slate-900 flex items-center gap-1.5">
+                      国家实力排行榜
+                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 font-semibold">
+                        {workspaceNations.length} 国
+                      </span>
+                    </h3>
+                    <p className="text-[10px] text-slate-500">主权实体综合实力与地缘指标排行</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleDownloadRankingPng}
+                    disabled={isExportingRanking || rankingList.length === 0}
+                    className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50 shadow-2xs"
+                    title="下载当前国家排行榜长图 (.png)"
+                  >
+                    <Download className="w-3.5 h-3.5 text-slate-600" />
+                    <span>{isExportingRanking ? '导出中...' : '下载排行'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsRankingModalOpen(false)}
+                    className="p-1.5 rounded-xl hover:bg-slate-200/60 text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                    title="关闭"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* 维度切换 Tabs */}
+              <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/40 flex items-center justify-between gap-1 overflow-x-auto">
+                <div className="flex items-center gap-1 bg-slate-200/70 p-0.5 rounded-xl text-xs font-medium text-slate-600 shrink-0 w-full">
+                  {[
+                    { key: 'power', label: '综合国力' },
+                    { key: 'provinces', label: '领土省份' },
+                    { key: 'population', label: '总人口' },
+                    { key: 'industry', label: '工业产能' },
+                  ].map((tab) => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => setRankingSortField(tab.key as any)}
+                      className={`flex-1 py-1 rounded-lg transition cursor-pointer text-[11px] text-center ${
+                        rankingSortField === tab.key
+                          ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 排行榜列表 - 清新卡片设计，采用真实国旗代表色，杜绝硬编码紫色 */}
+              <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
+                {rankingList.map((item, index) => {
+                  const isSelected = selectedNationId === item.nation.id;
+                  const rank = index + 1;
+                  const topScore = rankingList[0]?.powerScore || 1;
+                  const topProvs = rankingList[0]?.provinceCount || 1;
+                  const topPop = rankingList[0]?.totalPop || 1;
+                  const topFact = rankingList[0]?.totalFactories || 1;
+
+                  let progressPct = 100;
+                  if (rankingSortField === 'power') {
+                    progressPct = Math.max(5, Math.round((item.powerScore / Math.max(1, topScore)) * 100));
+                  } else if (rankingSortField === 'provinces') {
+                    progressPct = Math.max(5, Math.round((item.provinceCount / Math.max(1, topProvs)) * 100));
+                  } else if (rankingSortField === 'population') {
+                    progressPct = Math.max(5, Math.round((item.totalPop / Math.max(1, topPop)) * 100));
+                  } else if (rankingSortField === 'industry') {
+                    progressPct = Math.max(5, Math.round((item.totalFactories / Math.max(1, topFact)) * 100));
+                  }
+
+                  const nationColor = item.nation.flagColor || '#3B82F6';
+
+                  return (
+                    <div
+                      key={item.nation.id}
+                      onClick={() => {
+                        setSelectedNationId(item.nation.id);
+                        setActiveMode('territory');
+                        showToast(`已选中【${item.nation.name}】进行疆域划拨`);
+                      }}
+                      style={
+                        isSelected
+                          ? { borderLeftColor: nationColor, borderLeftWidth: '4px' }
+                          : undefined
+                      }
+                      className={`p-2.5 rounded-xl border transition cursor-pointer flex flex-col gap-2 group ${
+                        isSelected
+                          ? 'bg-slate-50/90 border-slate-300 shadow-xs ring-1 ring-slate-300/50'
+                          : 'bg-white hover:bg-slate-50/80 border-slate-200/80 shadow-2xs'
+                      }`}
+                    >
+                      {/* 上半部：排名 + 自适应比例国旗 + 国名政体 + 快捷操作按钮 */}
+                      <div className="flex items-center justify-between gap-2 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {/* 排名序号 */}
+                          <div
+                            className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 border ${
+                              rank === 1
+                                ? 'bg-amber-100 border-amber-300 text-amber-900'
+                                : rank === 2
+                                ? 'bg-slate-100 border-slate-300 text-slate-800'
+                                : rank === 3
+                                ? 'bg-orange-100 border-orange-300 text-orange-900'
+                                : 'bg-slate-50 border-slate-200 text-slate-500 font-mono text-[11px]'
+                            }`}
+                          >
+                            {rank}
+                          </div>
+
+                          {/* 国旗：支持 1:1, 19:10, 1:2, 3:2 规范长宽比 */}
+                          <div
+                            style={{ aspectRatio: getAspectRatioCSS(item.nation.flagRatio) }}
+                            className="h-6 max-w-11 rounded-sm overflow-hidden bg-slate-100 border border-slate-200 shrink-0 shadow-2xs flex items-center justify-center"
+                          >
+                            <NationFlagDisplay
+                              flagUrl={item.nation.flagUrl}
+                              flagColor={item.nation.flagColor}
+                              name={item.nation.name}
+                              ratio={item.nation.flagRatio}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+
+                          {/* 国名与政体 */}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1">
+                              <span className="font-bold text-xs text-slate-900 truncate">
+                                {item.nation.name}
+                              </span>
+                              {item.nation.flagRatio && (
+                                <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-slate-100 text-slate-500 shrink-0 hidden sm:inline">
+                                  {item.nation.flagRatio}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-slate-500 truncate">
+                              {item.nation.regime || item.nation.nationType || '主权国家'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* 快捷操作：设置与档案 */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingNationForFullData(item.nation);
+                              setIsEditFullDataOpen(true);
+                            }}
+                            className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 text-[11px] font-semibold transition cursor-pointer flex items-center gap-1"
+                            title="设置国家档案与国旗比例"
+                          >
+                            <SlidersHorizontal className="w-3 h-3" />
+                            <span>设置</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDetailNationId(item.nation.id);
+                              setIsNationDetailOpen(true);
+                              setIsRankingModalOpen(false);
+                            }}
+                            className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold transition cursor-pointer whitespace-nowrap"
+                            title="查看国家档案"
+                          >
+                            档案
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 下半部：指标数据与细进度条（采用国家真实代表色） */}
+                      <div className="space-y-1">
+                        <div className="flex items-baseline justify-between text-xs font-bold text-slate-900 font-mono">
+                          <span>
+                            {rankingSortField === 'power' && `${item.powerScore.toLocaleString()} 分`}
+                            {rankingSortField === 'provinces' && `${item.provinceCount} 省`}
+                            {rankingSortField === 'population' && formatPopulation(item.totalPop)}
+                            {rankingSortField === 'industry' && `${item.totalFactories} 厂 (${item.civFactories}民/${item.milFactories}军)`}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-normal">
+                            {rankingSortField === 'power'
+                              ? `${item.provinceCount}省 · 人口${formatPopulation(item.totalPop)} · ${item.totalFactories}厂`
+                              : rankingSortField === 'provinces'
+                              ? `面积约 ${(item.totalArea / 10000).toFixed(1)}万 km²`
+                              : rankingSortField === 'population'
+                              ? `占世界 ${globalStats.totalGlobalPop > 0 ? ((item.totalPop / globalStats.totalGlobalPop) * 100).toFixed(1) : 0}%`
+                              : `民用 ${item.civFactories} · 军工 ${item.milFactories}`}
+                          </span>
+                        </div>
+
+                        {/* 比例条：采用国家本身代表色 */}
+                        <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-300"
+                            style={{
+                              width: `${progressPct}%`,
+                              backgroundColor: nationColor,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {rankingList.length === 0 && (
+                  <div className="py-12 text-center text-slate-400 text-xs">
+                    当前推演剧本中暂无国家实体
+                  </div>
+                )}
+              </div>
+
+              {/* 弹窗底部 */}
+              <div className="px-4 py-2.5 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+                <div className="text-[10px] text-slate-500 font-mono">
+                  共 {workspaceNations.length} 国 · 实时排位
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDownloadRankingPng}
+                    disabled={isExportingRanking || rankingList.length === 0}
+                    className="px-3 py-1 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                  >
+                    <Download className="w-3.5 h-3.5 text-slate-600" />
+                    <span>{isExportingRanking ? '导出中...' : '下载长图 (.png)'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsRankingModalOpen(false)}
+                    className="px-3 py-1 rounded-xl bg-slate-200 hover:bg-slate-300 text-xs font-semibold text-slate-700 cursor-pointer"
+                  >
+                    关闭
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 对话框: 剧本切换弹窗 */}
+      <AnimatePresence>
+        {showScenarioSwitchModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fadeIn">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden text-slate-800"
+            >
+              <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-[#F0ECFF] border border-[#6C4FF6]/25 flex items-center justify-center text-[#6C4FF6]">
+                    <Layers className="w-3.5 h-3.5" />
+                  </div>
+                  <h3 className="font-bold text-sm text-slate-900">推演剧本管理</h3>
+                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold ${
+                    workspacesList.filter((w) => w.id !== 'ws_default_1936').length >= MAX_CREATOR_WORKSPACES
+                      ? 'bg-rose-100 text-rose-700'
+                      : 'bg-[#F0ECFF] text-[#6C4FF6]'
+                  }`}>
+                    自建配额 {workspacesList.filter((w) => w.id !== 'ws_default_1936').length} / {MAX_CREATOR_WORKSPACES}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowScenarioSwitchModal(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-3 max-h-72 overflow-y-auto space-y-1.5 custom-scrollbar">
+                {workspacesList.map((ws) => {
+                  const isActive = activeWorkspace?.id === ws.id;
+                  const nationsCount = ws.customNations?.length || 0;
+                  const isSystemDefault = ws.id === 'ws_default_1936';
+
+                  return (
+                    <div
+                      key={ws.id}
+                      onClick={() => handleSwitchWorkspace(ws)}
+                      className={`p-3 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition ${
+                        isActive
+                          ? 'bg-[#F0ECFF] border-[#6C4FF6] text-[#5737D9]'
+                          : 'bg-white border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-xs text-slate-900 truncate">{ws.name}</span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-mono">
+                            {ws.era}
+                          </span>
+                          {isSystemDefault ? (
+                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-400 font-medium">
+                              系统预设
+                            </span>
+                          ) : (
+                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-violet-100 text-violet-700 font-medium">
+                              创作者自建
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                          {ws.description || '自定义推演沙盘'}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[11px] font-mono text-slate-500">
+                          {nationsCount} 国
+                        </span>
+                        {isActive && <CheckCircle2 className="w-4 h-4 text-[#6C4FF6]" />}
+
+                        {/* 自建剧本删除操作（释放创建配额） */}
+                        {!isSystemDefault && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteWorkspace(ws, e)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer ml-1"
+                            title="删除自建剧本以释放名额"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center">
+                {workspacesList.filter((w) => w.id !== 'ws_default_1936').length >= MAX_CREATOR_WORKSPACES ? (
+                  <div className="flex items-center gap-1.5 text-xs text-rose-600 font-semibold">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    <span>配额已满(3/3)，需删除旧剧本方可新建</span>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowScenarioSwitchModal(false);
+                      setShowCreationWizard(true);
+                    }}
+                    className="flex items-center gap-1 text-xs text-[#6C4FF6] hover:text-[#5737D9] font-bold whitespace-nowrap cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>新建剧本向导</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowScenarioSwitchModal(false)}
+                  className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-xs font-semibold text-slate-700 whitespace-nowrap cursor-pointer"
+                >
+                  关闭
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 新建剧本向导 */}
+      {showCreationWizard && (
+        <WorkspaceCreationWizard
+          isOpen={showCreationWizard}
+          onClose={() => setShowCreationWizard(false)}
+          onSuccess={handleWizardSuccess}
+          isCreator={true}
+          onOpenAuth={onOpenAuth}
+        />
+      )}
+
+      {/* 通用危险/确认对话框 */}
+      <AnimatePresence>
+        {confirmDialog.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fadeIn">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-sm bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-2xl text-slate-800"
+            >
+              <div className="flex items-center gap-2 mb-2 text-amber-600">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <h3 className="font-bold text-xs sm:text-sm text-slate-900">{confirmDialog.title}</h3>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed mb-4">
+                {confirmDialog.message}
+              </p>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+                  className="px-3 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-xs font-semibold text-slate-600 transition cursor-pointer whitespace-nowrap"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDialog.onConfirm}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold text-white transition shadow-2xs cursor-pointer whitespace-nowrap ${
+                    confirmDialog.isDangerous
+                      ? 'bg-rose-600 hover:bg-rose-700'
+                      : 'bg-[#6C4FF6] hover:bg-[#5737D9]'
+                  }`}
+                >
+                  {confirmDialog.confirmText}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 全局 Toast */}
+      <AnimatePresence>
+        {toastMessage && (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.9 }}
-            className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg backdrop-blur-sm pointer-events-none"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 15 }}
+            className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-white/95 border border-[#6C4FF6]/25 text-slate-800 text-xs font-semibold px-4 py-2 rounded-2xl shadow-xl backdrop-blur-md flex items-center gap-2 pointer-events-none whitespace-nowrap"
           >
-            {toastMsg}
+            <Sparkles className="w-3.5 h-3.5 text-[#6C4FF6] shrink-0" />
+            <span>{toastMessage}</span>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* 🌟 完整国家数据与国旗设置大弹窗 */}
+      {editingNationForFullData && (
+        <EditNationDataModal
+          isOpen={isEditFullDataOpen}
+          onClose={() => {
+            setIsEditFullDataOpen(false);
+            setEditingNationForFullData(null);
+          }}
+          nation={editingNationForFullData}
+          onSaveNation={(updated) => {
+            const nextList = workspaceNations.map((n) => (n.id === updated.id ? updated : n));
+            persistNationsUpdate(nextList);
+            showToast(`已成功保存【${updated.name}】的档案与国旗设置`);
+          }}
+          showToast={showToast}
+        />
+      )}
     </div>
-  );
-
-  if (!isOpen) return null;
-
-  return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-0 select-none overflow-hidden bg-[#F8F9FC]">
-        {renderWorkstationContent()}
-      </div>
-    </AnimatePresence>
   );
 };
