@@ -784,7 +784,7 @@ export const api = {
       id: 'usr_guest_' + Math.random().toString(36).substring(2, 9),
       username,
       password: 'guestPassword123',
-      douyinName: `${username}_抖音`,
+      douyinName: String(Math.floor(100000000 + Math.random() * 900000000)),
       role: 'user',
       avatarColor: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
       isLingyuBaby: true,
@@ -819,6 +819,7 @@ export const api = {
    }),
 
   updateProfile: (payload: {
+    username?: string;
     douyinName?: string;
     newPassword?: string;
     avatarColor?: string;
@@ -838,6 +839,9 @@ export const api = {
    resolve<{ message: string; user: User; myNation: Nation | null }>(() => {
     const user = currentUser();
     const updates: Partial<DBUser> = {};
+    if (payload.username !== undefined && payload.username.trim()) {
+     updates.username = payload.username.trim();
+    }
     if (payload.douyinName !== undefined) {
      updates.douyinName = payload.douyinName.trim();
      const myNation = db.findNationByOwnerId(user.id);

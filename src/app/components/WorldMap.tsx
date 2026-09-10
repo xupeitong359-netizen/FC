@@ -3832,7 +3832,7 @@ export const WorldMap: React.FC<WorldMapProps> = ({
          {hoveredNation.ownerUsername}
         </span>{' '}
         <span className="text-slate-400">
-         (抖音：{hoveredNation.ownerDouyinName})
+         (创联号：{hoveredNation.ownerDouyinName})
         </span>
        </p>
        <p>

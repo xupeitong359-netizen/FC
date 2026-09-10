@@ -163,7 +163,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
        type="text"
        value={searchTerm}
        onChange={(e) => setSearchTerm(e.target.value)}
-       placeholder="搜索国名、领主、抖音..."
+       placeholder="搜索国名、领主、创联号..."
        className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/10 transition-all"
       />
      </div>
@@ -175,7 +175,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
        <tr className="border-b-2 border-slate-100 text-slate-500 font-bold bg-slate-50">
         <th className="py-3 px-4 first:rounded-tl-xl">国家/国徽</th>
         <th className="py-3 px-4">首都</th>
-        <th className="py-3 px-4">领主及抖音</th>
+        <th className="py-3 px-4">领主及创联号</th>
         <th className="py-3 px-4">政体与意识形态</th>
         <th className="py-3 px-4">交战/条约</th>
         <th className="py-3 px-4 text-right last:rounded-tr-xl">管理操作</th>

@@ -28,6 +28,7 @@ interface AuthContextType {
  verifyAdminPassword: (password: string) => Promise<string>;
  updateUnreadCount: (count: number) => void;
  updateProfile: (payload: {
+  username?: string;
   douyinName?: string;
   newPassword?: string;
   avatarColor?: string;
@@ -247,6 +248,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
  const updateProfile = useCallback(
   async (payload: {
+   username?: string;
    douyinName?: string;
    newPassword?: string;
    avatarColor?: string;

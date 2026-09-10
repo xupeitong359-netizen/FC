@@ -208,9 +208,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   // 剧本管理交互状态
   const [editingScenario, setEditingScenario] = useState<WorkspaceItem | null>(null);
 
-  // 昵称与创作者代码：不要让「抖音」成为昵称的一部分
-  const rawName = user?.douyinName || user?.username || '领主·战略试玩家9796';
-  const displayName = rawName.replace(/_抖音$/, '');
+  // 昵称与创作者代码
+  const displayName = (user?.username || (user?.douyinName && !/^\d+$/.test(user.douyinName) ? user.douyinName : '')) || '领主·战略试玩家9796';
   const creatorCode = user?.creatorId || (user?.id ? `CR-${user.id.slice(-4).toUpperCase()}` : 'CR-43HV');
 
   // 核心字段与默认展示数据（还原图2真实数据呈现）
@@ -224,7 +223,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const currentFollowing = user?.followingCount || 153;
   const currentFollowers = user?.followersCount || 268;
   const currentUnreadBadge = user?.unreadBadge || 99;
-  const currentDouyinId = user?.douyinName || (rawName.includes('抖音') ? rawName : `${displayName}_抖音`);
+  const currentDouyinId = useMemo(() => {
+    if (user?.douyinName && /^\d+$/.test(user.douyinName.trim())) {
+      return user.douyinName.trim();
+    }
+    if (user?.id) {
+      let hash = 0;
+      for (let i = 0; i < user.id.length; i++) {
+        hash = (hash * 31 + user.id.charCodeAt(i)) % 900000000;
+      }
+      return String(100000000 + Math.abs(hash));
+    }
+    return '782910384';
+  }, [user?.douyinName, user?.id]);
 
   // 计算年龄（基于生日或预设）
   const userAge = useMemo(() => {
@@ -355,6 +366,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     if (!user) return;
     await updateProfile({
       douyinName: data.douyinName,
+      username: data.username,
       bio: data.bio,
       gender: data.gender,
       birthday: data.birthday,
@@ -941,7 +953,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
                     <TikTokIcon className="w-3.5 h-3.5 text-slate-700" />
-                    <span>创作者称谓 / 抖音号</span>
+                    <span>创作者称谓 / 创联号</span>
                   </label>
                   <input
                     type="text"
@@ -1160,7 +1172,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   )}
                 </div>
                 <h3 className="font-bold text-slate-900 text-lg">{displayName}</h3>
-                <p className="text-xs text-slate-500 font-mono">抖音号：{currentDouyinId}</p>
+                <p className="text-xs text-slate-500 font-mono">创联号：{currentDouyinId}</p>
               </div>
 
               {/* 二维码展示区域 */}
@@ -1189,11 +1201,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   type="button"
                   onClick={() => {
                     copyToClipboard(currentDouyinId, 'douyin');
-                    showToast('已复制抖音号');
+                    showToast('已复制创联号');
                   }}
                   className="px-4 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition cursor-pointer"
                 >
-                  复制抖音号
+                  复制创联号
                 </button>
                 <button
                   type="button"
@@ -1240,7 +1252,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                 <input
                   type="text"
-                  placeholder="搜索创作者称谓、抖音号或 CR 代码..."
+                  placeholder="搜索创作者称谓、创联号或 CR 代码..."
                   className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:border-[#6B50F0] focus:outline-hidden transition"
                 />
               </div>

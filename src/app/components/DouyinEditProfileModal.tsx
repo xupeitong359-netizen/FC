@@ -19,13 +19,19 @@ import {
   FolderGit2,
   Copy,
   Globe,
+  RefreshCw,
 } from 'lucide-react';
 import { TikTokIcon } from './TikTokIcon';
 import { User as UserType } from '../types';
 import { LOCATION_DATA, parseLocation } from '../lib/locationData';
 
+export function generateRandomChuangLianId(): string {
+  return String(Math.floor(100000000 + Math.random() * 900000000));
+}
+
 export interface DouyinProfileData {
   douyinName: string;
+  username?: string;
   bio: string;
   gender: string;
   birthday: string;
@@ -125,7 +131,15 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
   const [activeSheet, setActiveSheet] = useState<string | null>(null);
 
   // 表单状态
-  const [formDouyinName, setFormDouyinName] = useState(user.douyinName || user.username || '联合玲玉');
+  const [formDouyinName, setFormDouyinName] = useState(() => {
+    if (user.username && !/^\d{7,}$/.test(user.username)) {
+      return user.username;
+    }
+    if (user.douyinName && !/^\d+$/.test(user.douyinName)) {
+      return user.douyinName.replace(/_抖音$/, '');
+    }
+    return user.username || '联合玲玉';
+  });
   const [formBio, setFormBio] = useState(
     user.bio || '创作者联盟成员\n玲玉：@玲玉\n生活号\n恋人：@龙神'
   );
@@ -189,7 +203,12 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
       setFormLocation(`${selectedCountry} · ${selectedProvince}`);
     }
   };
-  const [formDouyinId, setFormDouyinId] = useState(user.douyinName || '77876871989');
+  const [formDouyinId, setFormDouyinId] = useState(() => {
+    if (user.douyinName && /^\d+$/.test(user.douyinName.trim())) {
+      return user.douyinName.trim();
+    }
+    return generateRandomChuangLianId();
+  });
   const [formServiceWidget, setFormServiceWidget] = useState(user.serviceWidget || '群聊');
   const [formCoverUrl, setFormCoverUrl] = useState(user.coverUrl || PRESET_COVERS[0].url);
   const [formAvatarUrl, setFormAvatarUrl] = useState(user.avatarUrl || PRESET_AVATARS[0].url);
@@ -234,7 +253,8 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
     setIsSubmitting(true);
     try {
       await onSave({
-        douyinName: formDouyinId.trim() || formDouyinName.trim(),
+        douyinName: formDouyinId.trim() || generateRandomChuangLianId(),
+        username: formDouyinName.trim() || undefined,
         bio: formBio.trim(),
         gender: formGender,
         birthday: formBirthday,
@@ -398,13 +418,13 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
             </div>
           </button>
 
-          {/* 6. 抖音号 */}
+          {/* 6. 创联号 */}
           <button
             type="button"
             onClick={() => setActiveSheet('douyinId')}
             className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 transition cursor-pointer"
           >
-            <span className="text-slate-900 font-medium w-24 shrink-0">抖音号</span>
+            <span className="text-slate-900 font-medium w-24 shrink-0">创联号</span>
             <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
               <span className="text-slate-800 font-mono">{formDouyinId}</span>
               <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
@@ -499,7 +519,7 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
                     {activeSheet === 'gender' && '选择性别'}
                     {activeSheet === 'birthday' && '修改生日'}
                     {activeSheet === 'location' && '修改所在地'}
-                    {activeSheet === 'douyinId' && '修改抖音号'}
+                    {activeSheet === 'douyinId' && '修改创联号'}
                     {activeSheet === 'password' && '修改登录密码'}
                   </h4>
                   <button
@@ -784,16 +804,26 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
                   </div>
                 )}
 
-                {/* Content: DOUYIN ID */}
+                {/* Content: CHUANGLIAN ID */}
                 {activeSheet === 'douyinId' && (
                   <div className="space-y-3">
-                    <input
-                      type="text"
-                      value={formDouyinId}
-                      onChange={(e) => setFormDouyinId(e.target.value)}
-                      placeholder="输入抖音账号"
-                      className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:border-[#6B50F0] focus:outline-hidden font-mono"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={formDouyinId}
+                        onChange={(e) => setFormDouyinId(e.target.value.replace(/\D/g, ''))}
+                        placeholder="输入纯数字创联号"
+                        className="flex-1 h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:border-[#6B50F0] focus:outline-hidden font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setFormDouyinId(generateRandomChuangLianId())}
+                        className="px-3.5 h-10 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700 shrink-0 transition cursor-pointer flex items-center gap-1.5"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
+                        <span>随机生成</span>
+                      </button>
+                    </div>
                   </div>
                 )}
 
