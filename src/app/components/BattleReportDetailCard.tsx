@@ -70,7 +70,7 @@ export const BattleReportDetailCard: React.FC<BattleReportDetailCardProps> = ({
     </div>
    </div>
 
-   {/* 2. 战力天平对比条 (Combat Power Ratio) */}
+   {/* 2. 战力天平对比条 */}
    <div className="space-y-1.5 bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
     <div className="flex items-center justify-between text-xs font-mono">
      <div className="flex items-center gap-1.5 text-rose-400 font-bold">
@@ -171,7 +171,7 @@ export const BattleReportDetailCard: React.FC<BattleReportDetailCardProps> = ({
     </div>
    </div>
 
-   {/* 4. 战役推演分阶段实录日志 (Chronological War Log) */}
+   {/* 4. 战役推演分阶段实录日志 */}
    <div className="space-y-2 pt-1 border-t border-slate-800">
     <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
      <span className="flex items-center gap-1 text-amber-300 font-bold">

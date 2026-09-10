@@ -36,6 +36,7 @@ export interface ResourceDefinition {
  badgeBg: string;
  badgeText: string;
  icon: string; // Text symbol / icon code
+ iconUrl: string; // Vector icon URL
  description: string;
  baseMarketPrice: number; // 玲玉币单价
  militaryUsage: string;
@@ -51,6 +52,7 @@ export const STRATEGIC_RESOURCES: Record<StrategicResourceType, ResourceDefiniti
   badgeBg: 'bg-slate-900 text-amber-300 border-amber-500/30',
   badgeText: 'text-amber-400',
   icon: 'OIL',
+  iconUrl: '/assets/resources/oil.svg',
   description: '重装甲部队、航空兵团、远洋战舰与现代后勤车队的命脉动力血液。',
   baseMarketPrice: 48,
   militaryUsage: '机械化装甲突击、战术空战轰炸、后勤补给车队、远洋舰船动力',
@@ -64,6 +66,7 @@ export const STRATEGIC_RESOURCES: Record<StrategicResourceType, ResourceDefiniti
   badgeBg: 'bg-slate-800 text-slate-100 border-slate-600',
   badgeText: 'text-slate-200',
   icon: 'STEEL',
+  iconUrl: '/assets/resources/steel.svg',
   description: '单兵步枪枪械、大口径火炮、装甲底盘、舰体装甲与工业建设的坚固骨架。',
   baseMarketPrice: 28,
   militaryUsage: '单兵制式枪械、压制火炮铸造、装甲车体底盘、军用舰艇船体',
@@ -77,6 +80,7 @@ export const STRATEGIC_RESOURCES: Record<StrategicResourceType, ResourceDefiniti
   badgeBg: 'bg-sky-950 text-sky-200 border-sky-600',
   badgeText: 'text-sky-400',
   icon: 'AL',
+  iconUrl: '/assets/resources/aluminium.svg',
   description: '战斗机翼身结构、轻量化引擎机体与战术无线电雷达元件的核心材料。',
   baseMarketPrice: 42,
   militaryUsage: '主力航空战机制造、精密火控雷达、高机动轻装甲装具',
@@ -90,6 +94,7 @@ export const STRATEGIC_RESOURCES: Record<StrategicResourceType, ResourceDefiniti
   badgeBg: 'bg-emerald-950 text-emerald-200 border-emerald-600',
   badgeText: 'text-emerald-300',
   icon: 'RUB',
+  iconUrl: '/assets/resources/rubber.svg',
   description: '军用卡车充气防弹轮胎、战机起落架减震轮与电气防水绝缘层的关键工业原料。',
   baseMarketPrice: 55,
   militaryUsage: '军用越野运输卡车轮胎、战机起落架轮胎、装甲步战车、战地绝缘防护',
@@ -103,6 +108,7 @@ export const STRATEGIC_RESOURCES: Record<StrategicResourceType, ResourceDefiniti
   badgeBg: 'bg-amber-950 text-amber-200 border-amber-600',
   badgeText: 'text-amber-300',
   icon: 'W',
+  iconUrl: '/assets/resources/tungsten.svg',
   description: '超硬穿甲弹丸、重型加农火炮炮管与先进反坦克穿甲弹的核心特种战略金属。',
   baseMarketPrice: 68,
   militaryUsage: '高级压制火炮身管、穿甲重炮弹头、反坦克炮弹药、特种破甲弹',
@@ -116,6 +122,7 @@ export const STRATEGIC_RESOURCES: Record<StrategicResourceType, ResourceDefiniti
   badgeBg: 'bg-purple-950 text-purple-200 border-purple-600',
   badgeText: 'text-purple-300',
   icon: 'CR',
+  iconUrl: '/assets/resources/chromium.svg',
   description: '重型装甲特种合金钢、高耐磨枪炮管与先进战机涡轮叶片的关键战略添加剂。',
   baseMarketPrice: 75,
   militaryUsage: '特种重型装甲合金钢板、主力战舰主装甲带、航空涡轮发动机叶片',

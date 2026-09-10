@@ -55,7 +55,7 @@ const EVENTS_DATA: EventItem[] = [
   },
   {
     id: 'ev_5',
-    title: '德奥合并（Anschluss）',
+    title: '德奥合并',
     year: '1938.03',
     type: '地缘危机',
     tension: '+7%',

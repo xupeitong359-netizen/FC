@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Palette, Check, X, Pipette, RotateCcw } from 'lucide-react';
+import { Palette, Check, X, Pipette, Sliders } from 'lucide-react';
+import { ColorArea, HueSlider, hexToHsv, hsvToHex, HSV } from './IntentColorPicker';
 
 export interface TerritoryColorOption {
   hex: string;
@@ -74,13 +75,35 @@ export const TerritoryColorPicker: React.FC<TerritoryColorPickerProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [customHex, setCustomHex] = useState(color);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [hsv, setHsv] = useState<HSV>(() => hexToHsv(color));
   const containerRef = useRef<HTMLDivElement>(null);
-  const nativePickerRef = useRef<HTMLInputElement>(null);
 
-  // 同步外部 color 到自定义输入框
+  // 同步外部 color 到自定义输入框与 HSV
   useEffect(() => {
     setCustomHex(color);
+    setHsv(hexToHsv(color));
   }, [color]);
+
+  const handleAreaChange = useCallback((s: number, v: number) => {
+    setHsv((prev) => {
+      const nextHsv = { ...prev, s, v };
+      const nextHex = hsvToHex(nextHsv.h, nextHsv.s, nextHsv.v);
+      setCustomHex(nextHex);
+      onChange(nextHex);
+      return nextHsv;
+    });
+  }, [onChange]);
+
+  const handleHueChange = useCallback((h: number) => {
+    setHsv((prev) => {
+      const nextHsv = { ...prev, h };
+      const nextHex = hsvToHex(nextHsv.h, nextHsv.s, nextHsv.v);
+      setCustomHex(nextHex);
+      onChange(nextHex);
+      return nextHsv;
+    });
+  }, [onChange]);
 
   // 点击外部自动收纳
   useEffect(() => {
@@ -277,30 +300,21 @@ export const TerritoryColorPicker: React.FC<TerritoryColorPickerProps> = ({
               </div>
             </div>
 
-            {/* 自定义拾色与 HEX 码输入（高度压紧，超低占位） */}
+            {/* 自定义拾色与 HEX 码输入（Intent UI 风格，彻底杜绝原生弹窗上移） */}
             <div className="pt-1.5 border-t border-slate-100 flex items-center gap-1.5">
-              {/* 原生拾色器快捷触发 */}
-              <div className="relative shrink-0">
-                <input
-                  ref={nativePickerRef}
-                  type="color"
-                  value={color}
-                  onChange={(e) => {
-                    const next = e.target.value;
-                    setCustomHex(next);
-                    onChange(next);
-                  }}
-                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                />
-                <button
-                  type="button"
-                  onClick={() => nativePickerRef.current?.click()}
-                  className="w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-slate-600 flex items-center justify-center transition cursor-pointer"
-                  title="调用高级吸管/拾色器"
-                >
-                  <Pipette className="w-3 h-3" />
-                </button>
-              </div>
+              {/* 展开/收起二维色区与色相条按钮 */}
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className={`w-6 h-6 rounded-md border flex items-center justify-center transition cursor-pointer shrink-0 ${
+                  showAdvanced
+                    ? 'bg-slate-900 border-slate-900 text-white'
+                    : 'bg-slate-100 hover:bg-slate-200/80 border-slate-200 text-slate-600'
+                }`}
+                title={showAdvanced ? '收起微调盘' : '展开 Intent UI 调色板'}
+              >
+                <Sliders className="w-3 h-3" />
+              </button>
 
               {/* HEX 文本输入框 */}
               <div className="flex-1 relative">
@@ -314,6 +328,20 @@ export const TerritoryColorPicker: React.FC<TerritoryColorPickerProps> = ({
                 />
               </div>
             </div>
+
+            {/* 展开的 Intent UI 调色板 (ColorArea + HueSlider) */}
+            {showAdvanced && (
+              <div className="mt-2 pt-2 border-t border-slate-100 space-y-2">
+                <ColorArea
+                  hue={hsv.h}
+                  saturation={hsv.s}
+                  value={hsv.v}
+                  onChange={handleAreaChange}
+                  height={90}
+                />
+                <HueSlider hue={hsv.h} onChange={handleHueChange} />
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

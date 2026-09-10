@@ -21,6 +21,8 @@ import { useAuth } from '../context/AuthContext';
 import { renderEmblemIcon } from '../lib/icons';
 import { TikTokIcon } from './TikTokIcon';
 import { FlagCropperModal } from './FlagCropperModal';
+import { TerritoryColorPicker } from './TerritoryColorPicker';
+import { NationFontSelector } from './NationFontSelector';
 
 interface EditNationModalProps {
  isOpen: boolean;
@@ -88,6 +90,7 @@ export const EditNationModal: React.FC<EditNationModalProps> = ({
  const [customCurrencyName, setCustomCurrencyName] = useState('');
  const [currencyRate, setCurrencyRate] = useState<number>(1);
  const [flagColor, setFlagColor] = useState('#1e40af');
+ const [nameFont, setNameFont] = useState('condensed');
  const [emblemIcon, setEmblemIcon] = useState('Crown');
 
  // Flag 3:4 Cropper State
@@ -119,6 +122,7 @@ export const EditNationModal: React.FC<EditNationModalProps> = ({
    setCurrencyRate(typeof nation.currencyRate === 'number' && nation.currencyRate > 0 ? nation.currencyRate : 1);
 
    setFlagColor(nation.flagColor || '#1e40af');
+   setNameFont(nation.nameFont || 'condensed');
    setEmblemIcon(nation.emblemIcon || 'Crown');
    setError(null);
   }
@@ -157,6 +161,7 @@ export const EditNationModal: React.FC<EditNationModalProps> = ({
     currency: finalCurrency,
     currencyRate: finalCurrencyRate,
     flagColor,
+    nameFont,
     emblemIcon,
    });
 
@@ -681,15 +686,25 @@ export const EditNationModal: React.FC<EditNationModalProps> = ({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
        <div>
-        <label className="block text-xs font-bold text-slate-700 mb-1.5">版图基准色</label>
+        <div className="flex items-center justify-between mb-1.5">
+         <label className="block text-xs font-bold text-slate-700">地块领土涂装色</label>
+        </div>
+        <div className="mb-2">
+         <TerritoryColorPicker
+          color={flagColor}
+          onChange={setFlagColor}
+          variant="pill"
+          nationName={name || nation.name}
+         />
+        </div>
         <div className="flex flex-wrap gap-1.5">
          {FLAG_COLORS.map((c) => (
           <button
            key={c.value}
            type="button"
            onClick={() => setFlagColor(c.value)}
-           className={`w-6 h-6 rounded border transition-all cursor-pointer ${
-            flagColor === c.value
+           className={`w-5 h-5 rounded border transition-all cursor-pointer ${
+            flagColor.toLowerCase() === c.value.toLowerCase()
              ? 'ring-2 ring-slate-900 border-white scale-110 shadow-sm'
              : 'border-slate-300 opacity-80 hover:opacity-100'
            }`}
@@ -766,6 +781,15 @@ export const EditNationModal: React.FC<EditNationModalProps> = ({
           )}
          </div>
         </div>
+       </div>
+
+       {/* Map Nation Name Typography (国家名称字体) */}
+       <div className="pt-3 border-t border-slate-100">
+        <NationFontSelector
+         value={nameFont}
+         onChange={setNameFont}
+         sampleText={name || nation.name}
+        />
        </div>
       </div>
      </div>

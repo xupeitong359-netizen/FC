@@ -196,8 +196,10 @@ export const StrategicContextPanel: React.FC<StrategicContextPanelProps> = ({
            key={resKey}
            className="p-2 bg-slate-50 border border-slate-200/80 rounded-[2px] flex items-center justify-between text-xs"
           >
-           <div className="flex items-center gap-1.5">
-            <span className="text-base">{def.icon}</span>
+           <div className="flex items-center gap-2">
+            <span className="w-5 h-5 rounded-[2px] p-0.5 flex items-center justify-center shrink-0" style={{ backgroundColor: def.color }}>
+             <img src={def.iconUrl} alt={def.name} className="w-full h-full object-contain" />
+            </span>
             <span className="font-bold text-slate-800">{def.name}矿床</span>
            </div>
            <span className="font-mono font-bold text-emerald-700">

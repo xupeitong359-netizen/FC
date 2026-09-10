@@ -356,7 +356,7 @@ export const CreateAllianceModal: React.FC<CreateAllianceModalProps> = ({
 
             {/* Alliance Rules Checkboxes */}
             <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
-              <span className="text-xs font-bold text-slate-800 block">公约核心条款 (Alliance Rules)</span>
+              <span className="text-xs font-bold text-slate-800 block">公约核心条款</span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-700">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input

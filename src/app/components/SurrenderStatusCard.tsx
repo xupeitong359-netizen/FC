@@ -131,7 +131,7 @@ export const SurrenderStatusCard: React.FC<SurrenderStatusCardProps> = ({
      <div className="flex items-center gap-2 mb-1">
       <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
        <StrategicWarfareIcon size={14} className="text-rose-500" />
-       国家战争意志与投降倾向 (Capitulation Risk)
+       国家战争意志与投降倾向
       </span>
       {isCapitulated && (
        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-900 text-white uppercase flex items-center gap-1">
@@ -180,7 +180,7 @@ export const SurrenderStatusCard: React.FC<SurrenderStatusCardProps> = ({
    {topFactors.length > 0 && (
     <div className="space-y-2">
      <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center justify-between">
-      <span>主要影响因素 (Key Drivers)</span>
+      <span>主要影响因素</span>
       <span className="text-[10px] font-mono text-slate-400 font-normal">
        {calculation.resistanceModifier !== 0 &&
         `国家抵抗修正: ${calculation.resistanceModifier > 0 ? `+${Math.round(calculation.resistanceModifier * 100)}%` : `${Math.round(calculation.resistanceModifier * 100)}%`}`}

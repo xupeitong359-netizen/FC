@@ -38,10 +38,34 @@ export interface WorkspaceRulesConfig {
   initialTension?: number;
 }
 
+export interface WorkspaceGlobalSettings {
+  /** 全局国家名称标绘字体 (如 'condensed', 'sans', 'serif', 'kaiti', 'fangsong', 'cinzel') */
+  nationFontFamily?: string;
+  /** 全局未勘定/中立地块底色 (Hex，如 '#DCECCF', '#CBD5E1', '#141C2B') */
+  neutralTerritoryColor?: string;
+  /** 全局海洋水域底色 (Hex，如 '#E3EDF6', '#090E17', '#1E293B') */
+  oceanColor?: string;
+  /** 国界轮廓线色彩 (Hex，如 '#53645A', '#E2E8F0', '#FFFFFF') */
+  borderStrokeColor?: string;
+  /** 是否开启全图省份名称标绘 */
+  showProvinceLabels?: boolean;
+  /** 是否开启国家全称大字标绘 */
+  showNationLabels?: boolean;
+  /** 地图视觉风格 ('white' | 'grey') */
+  mapTheme?: 'white' | 'grey';
+  /** 国家名称字号缩放比例 (0.8 - 1.4，默认 1.0) */
+  nationFontScale?: number;
+}
+
 export interface CustomProvinceOverride {
   id: string | number;
   name?: string;
+  colorHex?: string;
   manpower?: number;
+  civilianFactories?: number;
+  militaryFactories?: number;
+  isCore?: boolean;
+  ownerNationId?: string;
   populationName?: string;
   terrainType?: string;
   resources?: ProvinceStrategicResources;
@@ -63,6 +87,7 @@ export interface WorkspaceItem {
   totemIcon?: string;
   themeColor?: string;
   rulesConfig?: WorkspaceRulesConfig;
+  globalSettings?: WorkspaceGlobalSettings;
   coreFactions?: string[];
   joinPolicy?: 'open' | 'apply' | 'spectate';
   victoryCondition?: 'domination' | 'treaty' | 'endless';
@@ -372,6 +397,7 @@ export const workspaceService = {
     victoryCondition?: 'domination' | 'treaty' | 'endless';
     initialTension?: number;
     licenseType?: string;
+    customNations?: Nation[];
     creatorId: string;
     creatorName: string;
   }): WorkspaceItem {
@@ -427,6 +453,7 @@ export const workspaceService = {
       victoryCondition: payload.victoryCondition || payload.rulesConfig?.victoryCondition || 'domination',
       initialTension: payload.initialTension ?? payload.rulesConfig?.initialTension ?? 25,
       licenseType: payload.licenseType || 'CC-BY-NC 自由派生',
+      customNations: payload.customNations || [],
       createdAt: new Date().toISOString(),
       likesCount: 0,
       likedUserIds: [],
@@ -711,5 +738,87 @@ export const workspaceService = {
       detail: { workspaceId, count: modifiedCount }
     }));
     return modifiedCount;
+  },
+
+  // 获取工作区全局设置
+  getGlobalSettings(workspaceId: string): WorkspaceGlobalSettings {
+    const list = this.getWorkspaces();
+    const ws = list.find((w) => w.id === workspaceId);
+    return ws?.globalSettings || {
+      nationFontFamily: 'condensed',
+      neutralTerritoryColor: '#DCECCF',
+      oceanColor: '#E3EDF6',
+      borderStrokeColor: '#53645A',
+      showProvinceLabels: false,
+      showNationLabels: true,
+      mapTheme: 'white',
+      nationFontScale: 1.0,
+    };
+  },
+
+  // 更新工作区全局设置
+  updateGlobalSettings(workspaceId: string, settings: Partial<WorkspaceGlobalSettings>): WorkspaceGlobalSettings {
+    const list = this.getWorkspaces();
+    const index = list.findIndex((w) => w.id === workspaceId);
+    if (index === -1) {
+      return settings as WorkspaceGlobalSettings;
+    }
+
+    const current = list[index].globalSettings || {
+      nationFontFamily: 'condensed',
+      neutralTerritoryColor: '#DCECCF',
+      oceanColor: '#E3EDF6',
+      borderStrokeColor: '#53645A',
+      showProvinceLabels: false,
+      showNationLabels: true,
+      mapTheme: 'white',
+      nationFontScale: 1.0,
+    };
+
+    const nextSettings: WorkspaceGlobalSettings = {
+      ...current,
+      ...settings,
+    };
+
+    list[index].globalSettings = nextSettings;
+    list[index].updatedAt = new Date().toISOString();
+    this.saveWorkspaces(list);
+
+    window.dispatchEvent(new CustomEvent('workspace-global-settings-updated', {
+      detail: { workspaceId, settings: nextSettings }
+    }));
+
+    return nextSettings;
+  },
+
+  // 重置单个省份的自定义覆盖数据
+  resetProvinceOverride(workspaceId: string, provinceId: string | number): void {
+    const list = this.getWorkspaces();
+    const index = list.findIndex((w) => w.id === workspaceId);
+    if (index === -1) return;
+
+    const ws = list[index];
+    if (ws.provinceOverrides) {
+      delete ws.provinceOverrides[String(provinceId)];
+      list[index] = ws;
+      this.saveWorkspaces(list);
+      window.dispatchEvent(new CustomEvent('province-override-updated', {
+        detail: { workspaceId, provinceId, data: null }
+      }));
+    }
+  },
+
+  // 清空该工作区所有省份的自定义覆盖数据
+  clearAllProvinceOverrides(workspaceId: string): void {
+    const list = this.getWorkspaces();
+    const index = list.findIndex((w) => w.id === workspaceId);
+    if (index === -1) return;
+
+    list[index].provinceOverrides = {};
+    list[index].updatedAt = new Date().toISOString();
+    this.saveWorkspaces(list);
+    window.dispatchEvent(new CustomEvent('province-batch-override-updated', {
+      detail: { workspaceId, count: 0 }
+    }));
   }
 };

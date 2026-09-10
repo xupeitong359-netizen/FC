@@ -76,7 +76,7 @@ import {
 import { getTotalCivilianFactories } from '../lib/economyEngine';
 import { getTotalMilitaryFactories } from '../lib/militaryIndustry';
 import { calculateNationResourceOverview } from '../lib/strategicCommandEngine';
-import { workspaceService, WorkspaceItem } from '../services/workspaceService';
+import { workspaceService, WorkspaceItem, MAX_CREATOR_WORKSPACES } from '../services/workspaceService';
 import { getSavedMapTheme, saveMapTheme, MapVisualTheme } from '../lib/mapThemes';
 import { SettingsDebugModal } from './SettingsDebugModal';
 import { useAppSettings } from '../services/settingsService';
@@ -755,6 +755,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           <button
             type="button"
             onClick={() => {
+              const quota = workspaceService.canCreateWorkspace(user?.id);
+              if (!quota.allowed) {
+                window.dispatchEvent(
+                  new CustomEvent('app-toast', {
+                    detail: {
+                      message: `自建工作区配额已满（${quota.currentCount}/${MAX_CREATOR_WORKSPACES}），无法进入创建页面，请先删除部分已有工作区以释放名额`,
+                    },
+                  })
+                );
+                return;
+              }
               const newWs: WorkspaceItem = {
                 id: `ws_custom_${Date.now()}`,
                 name: '新创大战略沙盘推演剧本',
@@ -860,51 +871,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         )}
       </section>
 
-      {/* 2.4 系统设置入口 (前卫极简设计) */}
-      <section aria-label="系统偏好设置" className="pt-1">
-        <button
-          id="profile-open-settings-card-btn"
-          type="button"
-          onClick={() => setIsSettingsModalOpen(true)}
-          className="w-full rounded-2xl bg-white border border-slate-200/90 hover:border-slate-300 p-3.5 sm:p-4 transition-all duration-200 hover:shadow-xs cursor-pointer flex items-center justify-between group text-left"
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-white shrink-0 transition-transform group-hover:scale-105 shadow-2xs"
-              style={{ backgroundColor: settings.themeAccent }}
-            >
-              <Sliders className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-slate-900 text-sm tracking-tight group-hover:text-indigo-600 transition-colors">
-                  系统设置
-                </span>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-semibold border border-slate-200/50">
-                  {settings.uiLanguage} · {settings.simulationFps}FPS
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 mt-0.5 truncate font-medium">
-                舆图底色 · 译名规范 · 引擎推演
-              </p>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-1.5 pl-3 shrink-0">
-            <span
-              className="text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1 group-hover:shadow-2xs"
-              style={{
-                color: settings.themeAccent,
-                borderColor: `${settings.themeAccent}30`,
-                backgroundColor: `${settings.themeAccent}0a`,
-              }}
-            >
-              <span>配置</span>
-              <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-            </span>
-          </div>
-        </button>
-      </section>
 
       {/* 2.5 创作者个性化名片定制弹窗 (Edit Profile Modal) */}
       <AnimatePresence>
@@ -996,7 +963,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     rows={2}
                     value={formBio}
                     onChange={(e) => setFormBio(e.target.value)}
-                    placeholder="例如：专注于近代地缘大战略沙盘架构与架空历史剧本创作。"
+                    placeholder="个人简介..."
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:bg-white focus:border-[#6B50F0] focus:outline-hidden transition resize-none"
                   />
                 </div>
@@ -1008,13 +975,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                       <FolderGit2 className="w-3.5 h-3.5 text-slate-500" />
                       <span>CR 专属创作代码</span>
                     </span>
-                    <span className="text-[10px] text-slate-400">用于作品归属核验</span>
                   </label>
                   <input
                     type="text"
                     value={formCreatorId}
                     onChange={(e) => setFormCreatorId(e.target.value)}
-                    placeholder="如：CR-43HV 或 T4-PL-9824"
+                    placeholder="创作代码"
                     className="w-full h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:bg-white focus:border-[#6B50F0] focus:outline-hidden transition font-mono"
                   />
                 </div>
@@ -1025,7 +991,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     <BadgeCheck className="w-4 h-4 text-[#6B50F0]" />
                     <div>
                       <div className="text-xs font-medium text-slate-800">创作者身份认证</div>
-                      <div className="text-[11px] text-slate-400">展示轻量创作者身份标识</div>
                     </div>
                   </div>
                   <input

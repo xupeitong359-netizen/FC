@@ -6,15 +6,17 @@ import {
   Plus,
   ArrowRight,
   Trash2,
-  Sparkles,
   Check,
   Flag,
   Globe2,
   CheckCircle2,
   Image as ImageIcon,
+  Palette,
+  ChevronDown,
 } from 'lucide-react';
 import { Nation, RegimeType, IdeologyType, FlagRatio } from '../types';
 import { NationFlagDisplay, getAspectRatioCSS } from './NationFlagDisplay';
+import { IntentColorPicker } from './IntentColorPicker';
 
 interface QuickNationCreateModalProps {
   isOpen: boolean;
@@ -32,20 +34,36 @@ export const FLAG_RATIO_OPTIONS: { id: FlagRatio; label: string; desc: string }[
   { id: '1:1', label: '1:1', desc: '瑞士与梵蒂冈方旗 (1:1)' },
 ];
 
-// 预设高品味国旗配色基调 (紫色作为推荐基调之一)
-const PRESET_FLAG_PALETTES = [
-  { id: 'flag_purple', name: '皇室紫', color: '#6C4FF6', bg: '#F0ECFF' },
-  { id: 'flag_blue', name: '深钴蓝', color: '#2563EB', bg: '#EFF6FF' },
-  { id: 'flag_red', name: '赤烈红', color: '#DC2626', bg: '#FEF2F2' },
-  { id: 'flag_emerald', name: '云松绿', color: '#059669', bg: '#ECFDF5' },
-  { id: 'flag_amber', name: '金琥珀', color: '#D97706', bg: '#FFFBEB' },
-  { id: 'flag_navy', name: '远洋青', color: '#0E7490', bg: '#ECFEFF' },
-  { id: 'flag_slate', name: '玄武岩', color: '#334155', bg: '#F8FAFC' },
-  { id: 'flag_rose', name: '朱砂红', color: '#E11D48', bg: '#FFF1F2' },
+// 优化精选符合大国沙盘与地缘推演质感的国家代表色调 (经典10色)
+export const PRESET_FLAG_PALETTES = [
+  { id: 'flag_navy', name: '普鲁士蓝', color: '#1D4ED8', bg: '#EFF6FF', border: '#93C5FD' },
+  { id: 'flag_red', name: '朱砂红', color: '#DC2626', bg: '#FEF2F2', border: '#FCA5A5' },
+  { id: 'flag_purple', name: '帝国紫', color: '#6D28D9', bg: '#F5F3FF', border: '#C4B5FD' },
+  { id: 'flag_emerald', name: '苍松绿', color: '#047857', bg: '#ECFDF5', border: '#6EE7B7' },
+  { id: 'flag_amber', name: '琥珀金', color: '#D97706', bg: '#FFFBEB', border: '#FCD34D' },
+  { id: 'flag_teal', name: '远洋青', color: '#0F766E', bg: '#F0FDFA', border: '#5EEAD4' },
+  { id: 'flag_rose', name: '玫瑰绯', color: '#BE123C', bg: '#FFF1F2', border: '#FDA4AF' },
+  { id: 'flag_slate', name: '曜石黑', color: '#1E293B', bg: '#F8FAFC', border: '#CBD5E1' },
+  { id: 'flag_sky', name: '天青蓝', color: '#0284C7', bg: '#F0F9FF', border: '#7DD3FC' },
+  { id: 'flag_iron', name: '苍铁灰', color: '#475569', bg: '#F1F5F9', border: '#94A3B8' },
+];
+
+// 进阶扩展地缘推演色调 (无需触发原生弹出层，彻底杜绝UI上移与跳动)
+export const EXTENDED_FLAG_PALETTES = [
+  { id: 'ext_crimson', name: '暗绛红', color: '#991B1B' },
+  { id: 'ext_orange', name: '赤橙', color: '#EA580C' },
+  { id: 'ext_bronze', name: '古铜金', color: '#B45309' },
+  { id: 'ext_yellow', name: '缃黄', color: '#CA8A04' },
+  { id: 'ext_olive', name: '橄榄绿', color: '#4D7C0F' },
+  { id: 'ext_forest', name: '深林绿', color: '#065F46' },
+  { id: 'ext_deep_sea', name: '深海青', color: '#1E40AF' },
+  { id: 'ext_indigo', name: '群青靛', color: '#4338CA' },
+  { id: 'ext_mystic', name: '玄紫', color: '#7E22CE' },
+  { id: 'ext_peacock', name: '孔雀绿', color: '#0D9488' },
 ];
 
 // 政体选项（规范无 Emoji，专业地缘政治用语）
-const REGIME_OPTIONS: { label: string; regime: RegimeType; ideology: IdeologyType; desc: string }[] = [
+export const REGIME_OPTIONS: { label: string; regime: RegimeType; ideology: IdeologyType; desc: string }[] = [
   {
     label: '民主共和国',
     regime: '民主议会制',
@@ -84,22 +102,6 @@ const REGIME_OPTIONS: { label: string; regime: RegimeType; ideology: IdeologyTyp
   },
 ];
 
-// 随机国名精选库
-const RANDOM_NATION_NAMES = [
-  '神州自由联邦',
-  '华夏联合共和国',
-  '莱茵大公国',
-  '不列颠联邦帝国',
-  '高加索联合同盟',
-  '地中海自由同盟',
-  '北欧联合王国',
-  '新大陆共和联邦',
-  '东瀛自治联邦',
-  '安纳托利亚联邦',
-  '潘诺尼亚公国',
-  '爱琴海城邦联合',
-];
-
 export const QuickNationCreateModal: React.FC<QuickNationCreateModalProps> = ({
   isOpen,
   onClose,
@@ -114,16 +116,25 @@ export const QuickNationCreateModal: React.FC<QuickNationCreateModalProps> = ({
   const [uploadedFlagUrl, setUploadedFlagUrl] = useState<string | null>(null);
   const [selectedFlagRatio, setSelectedFlagRatio] = useState<FlagRatio>('3:2');
   const [selectedPaletteIndex, setSelectedPaletteIndex] = useState(0);
+  const [customColor, setCustomColor] = useState<string | null>(null);
+  const [showMoreColors, setShowMoreColors] = useState(false);
+  const [hexInputText, setHexInputText] = useState('');
   const [recentCreatedSuccessMsg, setRecentCreatedSuccessMsg] = useState<string | null>(null);
   const [keepOpenAfterCreate, setKeepOpenAfterCreate] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 随机国名
-  const handleRandomName = () => {
-    const pick = RANDOM_NATION_NAMES[Math.floor(Math.random() * RANDOM_NATION_NAMES.length)];
-    setNickname(pick);
+  // 自定义 Hex 颜色输入处理 (纯文本输入，无原生弹窗与滚动干扰)
+  const handleHexInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value.trim();
+    if (!val.startsWith('#') && val.length > 0) {
+      val = '#' + val;
+    }
+    setHexInputText(val);
+    if (/^#[0-9A-Fa-f]{6}$/.test(val) || /^#[0-9A-Fa-f]{3}$/.test(val)) {
+      setCustomColor(val);
+    }
   };
 
   // 图片文件解析逻辑 (支持 3:2 严格裁剪/保持)
@@ -185,6 +196,7 @@ export const QuickNationCreateModal: React.FC<QuickNationCreateModalProps> = ({
 
     const regimeOpt = REGIME_OPTIONS[selectedRegimeIndex];
     const palette = PRESET_FLAG_PALETTES[selectedPaletteIndex];
+    const finalFlagColor = customColor || palette?.color || '#1D4ED8';
 
     const newNation: Nation = {
       id: `nation_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -194,7 +206,7 @@ export const QuickNationCreateModal: React.FC<QuickNationCreateModalProps> = ({
       nationType: regimeOpt.label,
       regime: regimeOpt.regime,
       ideology: regimeOpt.ideology,
-      flagColor: palette.color,
+      flagColor: finalFlagColor,
       flagUrl: uploadedFlagUrl || undefined,
       flagRatio: selectedFlagRatio,
       provinces: [],
@@ -229,8 +241,10 @@ export const QuickNationCreateModal: React.FC<QuickNationCreateModalProps> = ({
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-    // 轮换下一个配色
+    // 轮换下一个配色并重置自定义颜色
     setSelectedPaletteIndex((prev) => (prev + 1) % PRESET_FLAG_PALETTES.length);
+    setCustomColor(null);
+    setHexInputText('');
 
     if (!keepOpenAfterCreate) {
       onClose();
@@ -313,15 +327,6 @@ export const QuickNationCreateModal: React.FC<QuickNationCreateModalProps> = ({
                   <span>国家全称 / 昵称</span>
                   <span className="text-rose-500">*</span>
                 </label>
-                <button
-                  type="button"
-                  onClick={handleRandomName}
-                  className="text-[11px] text-[#6C4FF6] hover:text-[#5737D9] font-medium flex items-center gap-1 cursor-pointer transition whitespace-nowrap active:scale-95"
-                  title="随机填入一个典雅国名"
-                >
-                  <Sparkles className="w-3 h-3 text-[#6C4FF6]" />
-                  <span>随机国名</span>
-                </button>
               </div>
 
               <div className="relative">
@@ -329,7 +334,7 @@ export const QuickNationCreateModal: React.FC<QuickNationCreateModalProps> = ({
                   type="text"
                   value={nickname}
                   onChange={(e) => setNickname(e.target.value.slice(0, 20))}
-                  placeholder="例如：神州自由联邦、不列颠联合邦..."
+                  placeholder="输入国家全称或昵称"
                   maxLength={20}
                   className="w-full h-10 px-3.5 pr-14 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white focus:bg-white text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#6C4FF6]/25 focus:border-[#6C4FF6] transition"
                   required
@@ -456,35 +461,112 @@ export const QuickNationCreateModal: React.FC<QuickNationCreateModalProps> = ({
                 className="hidden"
               />
 
-              {/* 国旗主题配色备选（无自定义图片时自动应用） */}
-              <div className="mt-2.5">
-                <span className="text-[11px] font-medium text-slate-500 block mb-1.5">
-                  或者选择国家代表色调 (未上传国旗时生效):
-                </span>
-                <div className="flex items-center gap-2 flex-wrap">
+              {/* 国家代表色调 */}
+              <div className="mt-3 pt-2.5 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-slate-700">
+                    国家代表色调
+                  </label>
+                  <span className="text-[11px] font-mono text-slate-400">
+                    {customColor ? '自定义' : PRESET_FLAG_PALETTES[selectedPaletteIndex]?.name} · {(customColor || PRESET_FLAG_PALETTES[selectedPaletteIndex]?.color || '').toUpperCase()}
+                  </span>
+                </div>
+
+                {/* 10 款经典大国代表色 (5列紧凑网格) */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
                   {PRESET_FLAG_PALETTES.map((p, idx) => {
-                    const isSelected = idx === selectedPaletteIndex;
+                    const isSelected = !customColor && idx === selectedPaletteIndex;
                     return (
                       <button
                         key={p.id}
                         type="button"
-                        onClick={() => setSelectedPaletteIndex(idx)}
-                        className={`h-7 px-2.5 rounded-lg border text-[11px] font-medium transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                        onClick={() => {
+                          setSelectedPaletteIndex(idx);
+                          setCustomColor(null);
+                          setHexInputText('');
+                        }}
+                        className={`h-7 px-2 rounded-lg border text-[11px] font-medium transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap justify-start ${
                           isSelected
-                            ? 'border-[#6C4FF6] bg-[#F0ECFF] text-[#6C4FF6] ring-1 ring-[#6C4FF6]'
-                            : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-600'
+                            ? 'border-slate-800 bg-slate-900 text-white shadow-xs font-bold'
+                            : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
                         }`}
+                        title={`${p.name} (${p.color})`}
                       >
                         <span
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          className="w-2.5 h-2.5 rounded-full shrink-0 ring-1 ring-black/10"
                           style={{ backgroundColor: p.color }}
                         />
-                        <span>{p.name}</span>
-                        {isSelected && <Check className="w-3 h-3 text-[#6C4FF6] shrink-0 stroke-[2.5]" />}
+                        <span className="truncate">{p.name}</span>
+                        {isSelected && <Check className="w-3 h-3 text-white ml-auto shrink-0 stroke-[2.5]" />}
                       </button>
                     );
                   })}
                 </div>
+
+                {/* 更多调色：Intent UI Color Picker 专业设计系统调色盘 */}
+                <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowMoreColors(!showMoreColors)}
+                    className={`h-7 px-2.5 rounded-lg border text-[11px] font-medium transition flex items-center gap-1.5 cursor-pointer ${
+                      showMoreColors
+                        ? 'border-slate-800 bg-slate-900 text-white'
+                        : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <Palette className="w-3.5 h-3.5" />
+                    <span>{showMoreColors ? '收起 Intent UI 调色板' : '自定义调色板'}</span>
+                    <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${showMoreColors ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {/* 自定义 Hex 代码直接键入与重置 */}
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="w-3.5 h-3.5 rounded-full border border-black/15 shrink-0 shadow-2xs"
+                      style={{ backgroundColor: customColor || PRESET_FLAG_PALETTES[selectedPaletteIndex]?.color || '#1D4ED8' }}
+                    />
+                    <input
+                      type="text"
+                      value={hexInputText}
+                      onChange={handleHexInputChange}
+                      placeholder={(customColor || PRESET_FLAG_PALETTES[selectedPaletteIndex]?.color || '#1D4ED8').toUpperCase()}
+                      maxLength={7}
+                      className="w-20 h-7 px-2 rounded-lg border border-slate-200 bg-white text-[11px] font-mono text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition"
+                      title="输入自定义十六进制色值，例如 #1D4ED8"
+                    />
+                    {customColor && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomColor(null);
+                          setHexInputText('');
+                        }}
+                        className="text-[11px] text-slate-400 hover:text-slate-600 cursor-pointer whitespace-nowrap"
+                      >
+                        重置
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* 展开的 Intent UI Color Picker 组件系统 */}
+                {showMoreColors && (
+                  <div className="mt-2.5">
+                    <IntentColorPicker
+                      color={customColor || PRESET_FLAG_PALETTES[selectedPaletteIndex]?.color || '#1D4ED8'}
+                      onChange={(newHex) => {
+                        setCustomColor(newHex);
+                        setHexInputText(newHex);
+                      }}
+                      swatches={EXTENDED_FLAG_PALETTES}
+                      swatchTitle="进阶地缘沙盘推荐色"
+                      onReset={() => {
+                        setCustomColor(null);
+                        setHexInputText('');
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
 

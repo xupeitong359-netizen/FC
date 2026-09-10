@@ -235,7 +235,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         <button
           onClick={onExportWorld}
           className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 border border-transparent hover:border-slate-200 transition"
-          title="导出世界存档数据 (JSON)"
+          title="导出世界存档数据"
         >
           <FileDown className="w-4 h-4" />
         </button>

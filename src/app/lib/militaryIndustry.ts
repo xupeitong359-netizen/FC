@@ -232,7 +232,7 @@ export const STANDARD_EQUIPMENT_TEMPLATES: StandardEquipmentTemplate[] = [
    },
    {
     tier: 2,
-    name: 'Type II 防雷反伏击轮式装甲车 (MRAP)',
+    name: 'Type II 防雷反伏击轮式装甲车',
     addedCost: 2.5,
     totalCost: 7.5,
     costDisplay: '7.5 产能 / 辆',
@@ -442,7 +442,7 @@ export const STANDARD_EQUIPMENT_TEMPLATES: StandardEquipmentTemplate[] = [
    },
    {
     tier: 3,
-    name: 'Type III 现代化反坦克导弹发射车 (ATGM)',
+    name: 'Type III 现代化反坦克导弹发射车',
     addedCost: 8.0,
     totalCost: 18.0,
     costDisplay: '18.0 产能 / 辆',
@@ -482,7 +482,7 @@ export const STANDARD_EQUIPMENT_TEMPLATES: StandardEquipmentTemplate[] = [
    },
    {
     tier: 3,
-    name: 'Type III 300mm 重型远程自行多管火箭炮 (MLRS)',
+    name: 'Type III 300mm 重型远程自行多管火箭炮',
     addedCost: 8.5,
     totalCost: 18.0,
     costDisplay: '18.0 产能 / 辆',

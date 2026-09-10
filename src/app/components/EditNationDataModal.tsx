@@ -24,6 +24,7 @@ import { getTotalCivilianFactories } from '../lib/economyEngine';
 import { calculateNationResourceOverview, StrategicResourceType } from '../lib/strategicCommandEngine';
 import { NationFlagDisplay, getAspectRatioCSS } from './NationFlagDisplay';
 import { TerritoryColorPicker } from './TerritoryColorPicker';
+import { NationFontSelector } from './NationFontSelector';
 
 interface EditNationDataModalProps {
   isOpen: boolean;
@@ -78,6 +79,7 @@ export const EditNationDataModal: React.FC<EditNationDataModalProps> = ({
   const [regime, setRegime] = useState<RegimeType>(nation.regime || '联邦共和制');
   const [ideology, setIdeology] = useState<IdeologyType>(nation.ideology || '自由民主主义');
   const [flagColor, setFlagColor] = useState(nation.flagColor || '#3b82f6');
+  const [nameFont, setNameFont] = useState(nation.nameFont || 'condensed');
   const [flagUrl, setFlagUrl] = useState<string | undefined>(nation.flagUrl);
   const [flagRatio, setFlagRatio] = useState<FlagRatio>(nation.flagRatio || '3:2');
   const [description, setDescription] = useState(nation.description || '');
@@ -200,6 +202,7 @@ export const EditNationDataModal: React.FC<EditNationDataModalProps> = ({
       regime,
       ideology,
       flagColor,
+      nameFont,
       flagUrl: flagUrl || undefined,
       flagRatio,
       description: description.trim(),
@@ -428,7 +431,7 @@ export const EditNationDataModal: React.FC<EditNationDataModalProps> = ({
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
-                      <span>陆军指挥经验值 (XP)</span>
+                      <span>陆军指挥经验值</span>
                       <span className="font-mono text-xs font-bold text-amber-600">{armyExperience} 点</span>
                     </label>
                     <div className="flex items-center gap-2">
@@ -610,12 +613,12 @@ export const EditNationDataModal: React.FC<EditNationDataModalProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   {[
-                    { key: 'oil', label: '石油 (Oil)', desc: '用于装甲发动机、航空汽油与战舰远洋', color: 'text-amber-500' },
-                    { key: 'steel', label: '钢铁 (Steel)', desc: '坦克底盘、枪炮锻造与装甲板骨架', color: 'text-slate-400' },
-                    { key: 'aluminium', label: '铝材 (Aluminium)', desc: '战机蒙皮、无线电仪表与航空引擎', color: 'text-sky-400' },
-                    { key: 'rubber', label: '橡胶 (Rubber)', desc: '卡车轮胎、战车履带衬套与电缆绝缘', color: 'text-emerald-500' },
-                    { key: 'tungsten', label: '钨矿 (Tungsten)', desc: '穿甲弹芯、重型反坦克炮与特种工具钢', color: 'text-violet-400' },
-                    { key: 'chromium', label: '铬矿 (Chromium)', desc: '超重型战车装甲镀层与现代舰体结构', color: 'text-rose-400' },
+                    { key: 'oil', label: '石油', desc: '用于装甲发动机、航空汽油与战舰远洋', color: 'text-amber-500' },
+                    { key: 'steel', label: '钢铁', desc: '坦克底盘、枪炮锻造与装甲板骨架', color: 'text-slate-400' },
+                    { key: 'aluminium', label: '铝材', desc: '战机蒙皮、无线电仪表与航空引擎', color: 'text-sky-400' },
+                    { key: 'rubber', label: '橡胶', desc: '卡车轮胎、战车履带衬套与电缆绝缘', color: 'text-emerald-500' },
+                    { key: 'tungsten', label: '钨矿', desc: '穿甲弹芯、重型反坦克炮与特种工具钢', color: 'text-violet-400' },
+                    { key: 'chromium', label: '铬矿', desc: '超重型战车装甲镀层与现代舰体结构', color: 'text-rose-400' },
                   ].map((res) => {
                     const rKey = res.key as StrategicResourceType;
                     return (
@@ -694,7 +697,7 @@ export const EditNationDataModal: React.FC<EditNationDataModalProps> = ({
                 {/* Regime & Ideology */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">政体制度 (Regime)</label>
+                    <label className="text-xs font-bold text-slate-700">政体制度</label>
                     <select
                       value={regime}
                       onChange={(e) => setRegime(e.target.value as RegimeType)}
@@ -707,7 +710,7 @@ export const EditNationDataModal: React.FC<EditNationDataModalProps> = ({
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">执政意识形态 (Ideology)</label>
+                    <label className="text-xs font-bold text-slate-700">执政意识形态</label>
                     <select
                       value={ideology}
                       onChange={(e) => setIdeology(e.target.value as IdeologyType)}
@@ -726,7 +729,7 @@ export const EditNationDataModal: React.FC<EditNationDataModalProps> = ({
                     <div className="flex items-center justify-between text-xs font-bold">
                       <span className="flex items-center gap-1.5 text-slate-700">
                         <Heart className="w-3.5 h-3.5 text-emerald-600" />
-                        国内稳定度 (Stability)
+                        国内稳定度
                       </span>
                       <span className="font-mono text-emerald-600 font-black">{stabilityIndex}%</span>
                     </div>
@@ -744,7 +747,7 @@ export const EditNationDataModal: React.FC<EditNationDataModalProps> = ({
                     <div className="flex items-center justify-between text-xs font-bold">
                       <span className="flex items-center gap-1.5 text-slate-700">
                         <Flame className="w-3.5 h-3.5 text-rose-600" />
-                        民众战争支持度 (War Support)
+                        民众战争支持度
                       </span>
                       <span className="font-mono text-rose-600 font-black">{warSupportIndex}%</span>
                     </div>
@@ -849,6 +852,15 @@ export const EditNationDataModal: React.FC<EditNationDataModalProps> = ({
                     nationName={name}
                     variant="form"
                     placement="bottom-start"
+                  />
+                </div>
+
+                {/* Country Name Map Font (国家名称字体) */}
+                <div className="pt-2 border-t border-slate-100">
+                  <NationFontSelector
+                    value={nameFont}
+                    onChange={setNameFont}
+                    sampleText={name || nation.name}
                   />
                 </div>
 

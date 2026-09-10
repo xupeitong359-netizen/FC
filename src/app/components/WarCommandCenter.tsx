@@ -59,7 +59,7 @@ export const WarCommandCenter: React.FC<WarCommandCenterProps> = ({
        <span>国家统帅部 · 战争指挥作战厅</span>
        {theaters.length > 0 && (
         <span className="px-2 py-0.5 bg-rose-50 text-rose-700 font-mono text-[10px] font-bold rounded-[2px] border border-rose-200 animate-pulse">
-         战时戒严状态 (DEFCON 1)
+         战时戒严状态
         </span>
        )}
       </h1>

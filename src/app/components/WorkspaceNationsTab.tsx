@@ -18,7 +18,7 @@ interface NationGroup {
 
 const NATIONS_MATRIX: NationGroup[] = [
   {
-    category: '全球主要列强（Major Powers）',
+    category: '全球主要列强',
     count: 7,
     nations: [
       { tag: 'GER', name: '德意志国', ideology: '法西斯', leader: '阿道夫·希特勒', color: '#475569', manpower: '6800万', factories: '108座', factions: '轴心国领袖' },
@@ -31,7 +31,7 @@ const NATIONS_MATRIX: NationGroup[] = [
     ],
   },
   {
-    category: '区域强权与中欧阵营（Regional Powers）',
+    category: '区域强权与中欧阵营',
     count: 12,
     nations: [
       { tag: 'ITA', name: '意大利王国', ideology: '法西斯', leader: '贝尼托·墨索里尼', color: '#15803d', manpower: '4300万', factories: '48座', factions: '轴心国' },
@@ -43,7 +43,7 @@ const NATIONS_MATRIX: NationGroup[] = [
     ],
   },
   {
-    category: '独立主权邦与自治领（Sovereign Members）',
+    category: '独立主权邦与自治领',
     count: 174,
     nations: [
       { tag: 'RAJ', name: '英属印度', ideology: '中立', leader: '林利斯戈勋爵', color: '#f97316', manpower: '3.7亿', factories: '24座', factions: '英联邦成员' },

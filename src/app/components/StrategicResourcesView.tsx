@@ -31,6 +31,10 @@ interface StrategicResourcesViewProps {
 }
 
 export function renderResourceLucideIcon(resKey: StrategicResourceType, className = 'w-4 h-4') {
+ const def = STRATEGIC_RESOURCES[resKey];
+ if (def?.iconUrl) {
+  return <img src={def.iconUrl} alt={def.name} className={`${className} object-contain`} />;
+ }
  switch (resKey) {
   case 'oil':
    return <Fuel className={className} />;

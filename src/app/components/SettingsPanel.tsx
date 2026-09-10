@@ -221,7 +221,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <div className="flex items-center justify-between mb-2.5">
                 <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
                   <Palette className="w-3.5 h-3.5 text-slate-400" />
-                  <span>系统强调色 (Theme Accent)</span>
+                  <span>系统强调色</span>
                 </span>
                 <span className="text-[11px] font-mono text-slate-400">
                   Current: {settings.themeAccent}
@@ -286,52 +286,52 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
             </div>
 
-            {/* 1.2 沙盘地图底色主题 */}
+            {/* 1.2 系统颜色与外观 (System Theme) */}
             <div className="pt-5 border-t border-slate-100">
               <div className="flex items-center justify-between mb-2.5">
                 <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-                  <Sun className="w-3.5 h-3.5 text-slate-400" />
-                  <span>沙盘地图底色 (Cartographic Theme)</span>
+                  <Palette className="w-3.5 h-3.5 text-slate-400" />
+                  <span>系统颜色</span>
                 </span>
                 <span className="text-[11px] text-slate-500">
-                  当前: {settings.mapTheme === 'white' ? '白纸舆图' : '战备暗夜'}
+                  当前: {settings.mapTheme === 'white' ? '明亮浅色' : '战备深色'}
                 </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {/* 白纸舆图 */}
+                {/* 明亮浅色 */}
                 <button
-                  id="theme-map-white"
+                  id="theme-system-light"
                   type="button"
                   onClick={() => {
                     playTacticalAudio('toggle');
                     updateSetting('mapTheme', 'white');
-                    showToast('世界沙盘底图已即时切换为：白纸舆图');
+                    showToast('系统颜色已切换为：明亮浅色');
                   }}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between min-h-[64px] ${
                     settings.mapTheme === 'white'
-                      ? 'bg-white shadow-2xs border-slate-300'
-                      : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
+                      ? 'bg-white shadow-2xs border-[1.5px]'
+                      : 'bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
                   }`}
                   style={
                     settings.mapTheme === 'white'
                       ? {
-                          borderColor: `${settings.themeAccent}50`,
-                          backgroundColor: `${settings.themeAccent}06`,
+                          borderColor: settings.themeAccent,
+                          backgroundColor: `${settings.themeAccent}08`,
                         }
                       : {}
                   }
                 >
                   <div className="flex items-center gap-3 min-w-0 pr-1">
-                    <div className="w-8 h-8 rounded-lg border border-slate-200 bg-amber-50/60 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-lg border border-amber-200/80 bg-amber-50/80 flex items-center justify-center shrink-0">
                       <Sun className="w-4 h-4 text-amber-500" />
                     </div>
                     <div className="min-w-0">
-                      <div className="font-semibold text-slate-900 text-xs">
-                        白纸舆图（明丽版）
+                      <div className="font-semibold text-slate-900 text-xs leading-tight">
+                        明亮浅色
                       </div>
                       <div className="text-[11px] text-slate-500 mt-0.5 leading-tight">
-                        清爽高对比白色陆地，水墨省界与天青海洋
+                        经典清爽白调，搭配自然沙盘
                       </div>
                     </div>
                   </div>
@@ -347,39 +347,39 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   )}
                 </button>
 
-                {/* 战备暗夜 */}
+                {/* 战备深色 */}
                 <button
-                  id="theme-map-dark"
+                  id="theme-system-dark"
                   type="button"
                   onClick={() => {
                     playTacticalAudio('toggle');
                     updateSetting('mapTheme', 'grey');
-                    showToast('世界沙盘底图已即时切换为：战备暗夜');
+                    showToast('系统颜色已切换为：战备深色（全局偏黑模式）');
                   }}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between min-h-[64px] ${
                     settings.mapTheme === 'grey'
-                      ? 'bg-white shadow-2xs border-slate-300'
-                      : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
+                      ? 'bg-white shadow-2xs border-[1.5px]'
+                      : 'bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50/60'
                   }`}
                   style={
                     settings.mapTheme === 'grey'
                       ? {
-                          borderColor: `${settings.themeAccent}50`,
-                          backgroundColor: `${settings.themeAccent}06`,
+                          borderColor: settings.themeAccent,
+                          backgroundColor: `${settings.themeAccent}08`,
                         }
                       : {}
                   }
                 >
                   <div className="flex items-center gap-3 min-w-0 pr-1">
-                    <div className="w-8 h-8 rounded-lg border border-slate-800 bg-slate-900 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-lg border border-slate-700 bg-slate-900 flex items-center justify-center shrink-0">
                       <Moon className="w-4 h-4 text-indigo-300" />
                     </div>
                     <div className="min-w-0">
-                      <div className="font-semibold text-slate-900 text-xs">
-                        战备暗夜（深色版）
+                      <div className="font-semibold text-slate-900 text-xs leading-tight">
+                        战备深色
                       </div>
                       <div className="text-[11px] text-slate-500 mt-0.5 leading-tight">
-                        深石板夜间战术底图，微光国界与低照度视效
+                        全局暗夜沉浸，整体偏黑质感
                       </div>
                     </div>
                   </div>
@@ -401,7 +401,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <div className="pt-5 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2">
               <div>
                 <span className="text-xs font-semibold text-slate-900 block">
-                  界面色彩对比度 (Contrast Mode)
+                  界面色彩对比度
                 </span>
                 <span className="text-[11px] text-slate-400 mt-0.5 block">
                   增强地缘国界划分、卡片边缘与文字排版的轮廓锐度
@@ -447,7 +447,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <div className="flex items-center justify-between mb-2.5">
                 <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
                   <Languages className="w-3.5 h-3.5 text-slate-400" />
-                  <span>界面主语言 (UI Language)</span>
+                  <span>界面主语言</span>
                 </span>
                 <span className="text-[11px] text-slate-400 font-mono">
                   Active: {settings.uiLanguage}
@@ -500,7 +500,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <div className="pt-5 border-t border-slate-100">
               <div className="flex items-center justify-between mb-2.5">
                 <span className="text-xs font-semibold text-slate-900">
-                  地名注记模式 (Geopolitical Naming Format)
+                  地名注记模式
                 </span>
                 <span className="text-[11px] text-slate-400">
                   地图省区、首都与据点翻译规范
@@ -565,7 +565,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <div className="pt-5 border-t border-slate-100 flex items-center justify-between gap-3">
               <div>
                 <span className="text-xs font-semibold text-slate-900 block">
-                  大战略地块调试编号 (Debug Province Codes)
+                  大战略地块调试编号
                 </span>
                 <span className="text-[11px] text-slate-400 mt-0.5 block">
                   在地图各省份地块上显示底层唯一代码标识（例如 GER_BER_01），便于定位边界
@@ -605,7 +605,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <div>
                 <div className="font-semibold text-slate-900 text-xs flex items-center gap-1.5">
                   <Grid className="w-3.5 h-3.5 text-slate-400" />
-                  <span>世界沙盘经纬度辅助网格 (Coordinate Grid)</span>
+                  <span>世界沙盘经纬度辅助网格</span>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-0.5">
                   在矢量大战略地图上绘制坐标参考网格线，辅助大洋航道与战区研判
@@ -644,7 +644,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   ) : (
                     <VolumeX className="w-3.5 h-3.5 text-slate-400" />
                   )}
-                  <span>战报与指令视听音效 (Tactical Audio)</span>
+                  <span>战报与指令视听音效</span>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-0.5">
                   宣战令下达、和约签署及推演调试时的低延迟合成器提示音
@@ -692,7 +692,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <div className="pt-5 border-t border-slate-100">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold text-slate-900">
-                  推演演算刷新率 (Engine Tick Rate)
+                  推演演算刷新率
                 </span>
                 <span className="text-[11px] font-mono text-slate-400">
                   Target: {settings.simulationFps} FPS

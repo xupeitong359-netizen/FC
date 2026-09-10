@@ -28,6 +28,7 @@ import {
 import { Nation } from '../types';
 import { renderEmblemIcon } from '../lib/icons';
 import { TikTokIcon } from './TikTokIcon';
+import { workspaceService, MAX_CREATOR_WORKSPACES } from '../services/workspaceService';
 import { getTotalCivilianFactories } from '../lib/economyEngine';
 import { getTotalMilitaryFactories } from '../lib/militaryIndustry';
 import { api } from '../services/api';
@@ -104,6 +105,17 @@ export const GeopoliticalFactionsSidebar: React.FC<GeopoliticalFactionsSidebarPr
     })
    );
    window.dispatchEvent(new CustomEvent('open-auth-register'));
+   return;
+  }
+  const quota = workspaceService.canCreateWorkspace();
+  if (!quota.allowed) {
+   window.dispatchEvent(
+    new CustomEvent('app-toast', {
+     detail: {
+      message: `自建工作区配额已满（${quota.currentCount}/${MAX_CREATOR_WORKSPACES}），无法进入创建页面，请先删除部分已有工作区以释放名额`,
+     },
+    })
+   );
    return;
   }
   window.dispatchEvent(new CustomEvent('open-workspace-wizard'));

@@ -100,6 +100,9 @@ export interface ResourceTradeDeal {
 export interface ProvinceData {
  id: string | number;
  name: string;
+ customName?: string;
+ colorHex?: string;
+ terrain?: string;
  civilianFactories: number;
  militaryFactories: number;
  factories?: number;
@@ -242,6 +245,7 @@ export interface Nation {
  currency: string;
  currencyRate?: number; // 对基准货币【玲玉币】的汇率 (例如 1 自定义币 = X 玲玉币，默认 1)
  flagColor: string;
+ nameFont?: string; // 国家名称地图显示字体 (如 'condensed', 'sans', 'serif', 'kaiti', 'fangsong', 'cinzel')
  emblemIcon: string;
  createdAt: string;
  updatedAt: string;

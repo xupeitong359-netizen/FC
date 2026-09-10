@@ -34,15 +34,15 @@ export interface MapThemeConfig {
 export const MAP_THEMES: Record<MapVisualTheme, MapThemeConfig> = {
   white: {
     id: 'white',
-    name: '纯白极简',
-    shortName: '纯白',
+    name: '经典沙盘',
+    shortName: '沙盘',
     ocean: '#E3EDF6',        // 高级北欧天青水蓝，通透清亮，海陆轮廓一目了然
-    land: '#FFFFFF',         // 纯白中立陆地
-    countryBorder: '#475569',// 深色主权国界，边界感坚实鲜明
-    provinceBorder: '#94A3B8',// 清晰省界网格 (微调提升对比度)
-    coastline: '#64748B',
-    grid: 'rgba(148, 163, 184, 0.35)',
-    seaHatchStroke: 'rgba(148, 163, 184, 0.3)',
+    land: '#DCECCF',         // 陆地：#DCECCF (自然中性柔和草木底色)
+    countryBorder: '#53645A',// 国家边界：#53645A (坚实分明的深色主权边界)
+    provinceBorder: '#A7C58F',// 省界：#A7C58F (中性辅助线，微弱划分内部地块)
+    coastline: '#53645A',
+    grid: 'rgba(83, 100, 90, 0.18)',
+    seaHatchStroke: 'rgba(83, 100, 90, 0.12)',
     containerBg: '#E3EDF6',
     
     uiPillBg: 'bg-white/95 backdrop-blur-md',
@@ -51,13 +51,13 @@ export const MAP_THEMES: Record<MapVisualTheme, MapThemeConfig> = {
     uiTextMuted: 'text-slate-500',
     uiBtnHover: 'hover:bg-slate-100',
     
-    labelColor: '#1E293B',
-    labelStroke: 'rgba(255, 255, 255, 0.9)',
+    labelColor: '#25352B',
+    labelStroke: 'rgba(220, 236, 207, 0.95)',
     
-    selectionHighlight: '#BFDBFE',
-    selectionStroke: '#2563EB',
-    hoverLandFill: '#EFF6FF',
-    hoverLandStroke: '#3B82F6',
+    selectionHighlight: '#86efac',
+    selectionStroke: '#15803d',
+    hoverLandFill: '#EAF4E0',
+    hoverLandStroke: '#53645A',
   },
   grey: {
     id: 'grey',

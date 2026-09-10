@@ -57,6 +57,7 @@ import { NationFlagDisplay, getAspectRatioCSS } from './NationFlagDisplay';
 import { QuickNationCreateModal } from './QuickNationCreateModal';
 import { EditNationDataModal } from './EditNationDataModal';
 import { TerritoryColorPicker } from './TerritoryColorPicker';
+import { WorkspaceGlobalSettingsModal } from './WorkspaceGlobalSettingsModal';
 import { exportRankingToPng } from '../utils/exportImage';
 
 interface WorkspaceModalProps {
@@ -247,9 +248,12 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
 
   // 🌟 国家排行弹窗状态与排序维度
   const [isRankingModalOpen, setIsRankingModalOpen] = useState(false);
+  // 🌟 全局设置弹窗状态（字体、地块颜色、省份数据与名称）
+  const [isGlobalSettingsOpen, setIsGlobalSettingsOpen] = useState(false);
   const [rankingSortField, setRankingSortField] = useState<'power' | 'provinces' | 'population' | 'industry'>('power');
   const [isExportingRanking, setIsExportingRanking] = useState(false);
   const [isExportingMap, setIsExportingMap] = useState(false);
+  const [mapExportResolution, setMapExportResolution] = useState<'4k' | '2k' | '1080p' | '8k'>('4k');
 
   // 🌟 右上角地图工具箱收起与展开（默认收起为小按钮）
   const [isMapToolsExpanded, setIsMapToolsExpanded] = useState(false);
@@ -259,9 +263,9 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
   const [mapMode, setMapMode] = useState<'political' | 'terrain' | 'population' | 'industrial' | 'resources'>('political');
   const [layerSettings, setLayerSettings] = useState({
     showCountryName: true,
-    showProvinceName: true,
+    showProvinceName: false,
     showGrid: false,
-    showLegend: true,
+    showLegend: false,
   });
 
   // 🌟 完整国家档案编辑大弹窗
@@ -433,23 +437,38 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
     });
   }, [workspaceNations, rankingSortField]);
 
-  // 🌟 下载当前视角下的无UI纯净世界地图 .png
-  const handleDownloadPureMapPng = useCallback(() => {
+  // 🌟 下载当前视角下的无UI纯净世界地图 .png (支持 4K 极清 / 2K 超清 / 8K 巨幅 / 1080P 高清)
+  const handleDownloadPureMapPng = useCallback((resolution?: '4k' | '2k' | '1080p' | '8k') => {
+    const targetRes = resolution || mapExportResolution;
     setIsExportingMap(true);
-    showToast('正在生成当前视角下的无UI纯净世界地图...');
+    const resLabels: Record<string, string> = {
+      '8k': '8K巨幅 (7680px)',
+      '4k': '4K极清 (3840px)',
+      '2k': '2K超清 (2560px)',
+      '1080p': '1080P高清 (1920px)',
+    };
+    const resName = resLabels[targetRes] || '4K极清';
+    showToast(`正在生成 ${resName} 纯净世界地图...`);
     window.dispatchEvent(
       new CustomEvent('map-download-current-view', {
         detail: {
-          fileName: `纯净世界地图_${activeWorkspace?.name || '沙盘推演'}_${new Date().toISOString().slice(0, 10)}.png`,
+          resolution: targetRes,
+          resolutionName: resName,
+          fileName: `纯净世界地图_${targetRes.toUpperCase()}_${activeWorkspace?.name || '沙盘推演'}_${new Date().toISOString().slice(0, 10)}.png`,
         },
       })
     );
-  }, [activeWorkspace?.name, showToast]);
+  }, [mapExportResolution, activeWorkspace?.name, showToast]);
 
   useEffect(() => {
     const handleDownloadFinished = (e: any) => {
       setIsExportingMap(false);
-      showToast('当前视角下的无UI纯净世界地图已成功下载为 PNG');
+      if (e?.detail?.success !== false) {
+        const resTitle = e?.detail?.resolutionName || (e?.detail?.width ? `${e.detail.width}×${e.detail.height}` : '4K极清');
+        showToast(`无UI纯净地图（${resTitle}）已成功下载为 PNG`);
+      } else {
+        showToast(e?.detail?.error || '地图生成失败，请重试');
+      }
     };
     window.addEventListener('map-download-finished', handleDownloadFinished);
     return () => {
@@ -889,7 +908,7 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
     showToast(`已切换至剧本【${ws.name}】`);
   };
 
-  // 新建剧本向导完成
+  // 新建剧本向导完成（先展示剧本设置，再展示国家建立页，全部流程在向导内无缝闭环）
   const handleWizardSuccess = (created: WorkspaceItem) => {
     setShowCreationWizard(false);
     const all = workspaceService.getWorkspaces();
@@ -897,10 +916,15 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
     setActiveWorkspace(created);
     const nations = created.customNations || [];
     setWorkspaceNations(nations);
-    setSelectedNationId(nations.length > 0 ? nations[0].id : null);
-    showToast(`新推演剧本【${created.name}】创建成功！`);
-    // 自动弹新建国弹窗引导建国
-    setIsQuickNationModalOpen(true);
+    if (nations.length > 0) {
+      setSelectedNationId(nations[0].id);
+      showToast(`剧本【${created.name}】与参演国家构筑完成，已自动激活，可直接划拔疆域！`);
+      setIsQuickNationModalOpen(false);
+    } else {
+      setSelectedNationId(null);
+      showToast(`新推演剧本【${created.name}】创建成功！`);
+      setIsQuickNationModalOpen(true);
+    }
   };
 
   // 导出剧本 JSON
@@ -940,13 +964,13 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
   return (
     <div className="fixed inset-0 z-[100] bg-[#F1F5F9] overflow-hidden select-none font-sans text-slate-800">
       {/* 🌟 顶部悬浮导航栏：轻、薄、悬浮于地图上方 */}
-      <div className="absolute top-3 left-3 right-3 z-30 pointer-events-none flex items-center justify-between gap-2">
+      <div className="absolute top-2.5 sm:top-3 left-2.5 sm:left-3 right-2.5 sm:right-3 z-30 pointer-events-none flex items-center justify-between gap-1.5 sm:gap-2">
         {/* 左侧：返回按钮 + 分配疆域胶囊下拉 + 历史时代标记 */}
-        <div className="pointer-events-auto flex items-center gap-2">
+        <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-2xl bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-md flex items-center justify-center text-slate-700 hover:text-slate-950 transition active:scale-95 cursor-pointer"
+            className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-2xl bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-md flex items-center justify-center text-slate-700 hover:text-slate-950 transition active:scale-95 cursor-pointer shrink-0"
             title="退出工作台并返回沙盘"
           >
             <ArrowLeft className="w-4 h-4 stroke-[2.2]" />
@@ -956,32 +980,42 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
           <button
             type="button"
             onClick={() => setShowScenarioSwitchModal(true)}
-            className="px-3 py-1.5 rounded-2xl bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-md flex items-center gap-1.5 text-xs font-bold text-slate-800 hover:bg-slate-50 transition active:scale-95 cursor-pointer"
+            className="h-8.5 sm:h-9 px-2.5 sm:px-3 rounded-2xl bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-md flex items-center gap-1.5 text-xs font-bold text-slate-800 hover:bg-slate-50 transition active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
           >
-            <MapPin className="w-3.5 h-3.5 text-[#6C4FF6] stroke-[2.4]" />
-            <span>分配疆域</span>
-            <ChevronDown className="w-3 h-3 text-slate-400" />
+            <MapPin className="w-3.5 h-3.5 text-[#6C4FF6] stroke-[2.4] shrink-0" />
+            <span className="whitespace-nowrap">分配疆域</span>
+            <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
           </button>
 
           {/* 剧本与纪元副标题 */}
-          <span className="text-[11px] text-slate-500 font-medium hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/85 backdrop-blur-md border border-slate-200/70 shadow-2xs">
+          <span className="text-[11px] text-slate-500 font-medium hidden md:inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/85 backdrop-blur-md border border-slate-200/70 shadow-2xs shrink-0 whitespace-nowrap">
             <span>{activeWorkspace?.name || '粉陆纪元'}</span>
             <span className="text-slate-300">·</span>
             <span>{activeWorkspace?.era ? `${activeWorkspace.era}年` : '1936年'}</span>
           </span>
         </div>
 
-        {/* 右侧：国家排行唤起按钮 + 更多操作 */}
-        <div className="pointer-events-auto flex items-center gap-1.5 relative">
+        {/* 右侧：全局设置 + 国家排行唤起按钮 + 更多操作 */}
+        <div className="pointer-events-auto flex items-center gap-1 sm:gap-1.5 shrink-0 relative">
+          <button
+            type="button"
+            onClick={() => setIsGlobalSettingsOpen(true)}
+            className="h-8.5 sm:h-9 px-2.5 sm:px-3 rounded-2xl bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-md flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-[#6C4FF6] hover:bg-slate-50 transition active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
+            title="沙盘全局设置：国家字体 / 地块底图颜色 / 省份数据与名称"
+          >
+            <Settings className="w-3.5 h-3.5 text-[#6C4FF6] shrink-0" />
+            <span className="whitespace-nowrap">全局设置</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setIsRankingModalOpen(true)}
-            className="px-3 py-1.5 rounded-2xl bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-md flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-[#6C4FF6] hover:bg-slate-50 transition active:scale-95 cursor-pointer"
+            className="h-8.5 sm:h-9 px-2.5 sm:px-3 rounded-2xl bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-md flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-[#6C4FF6] hover:bg-slate-50 transition active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
             title="查看国家排行"
           >
-            <Trophy className="w-3.5 h-3.5 text-[#6C4FF6]" />
-            <span>国家排行</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 text-[10px] font-mono">
+            <Trophy className="w-3.5 h-3.5 text-[#6C4FF6] shrink-0" />
+            <span className="whitespace-nowrap">国家排行</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 text-[10px] font-mono shrink-0">
               {workspaceNations.length}
             </span>
           </button>
@@ -989,7 +1023,7 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
           <button
             type="button"
             onClick={() => setShowMoreActions(!showMoreActions)}
-            className="w-9 h-9 rounded-2xl bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-md flex items-center justify-center text-slate-600 hover:text-slate-900 transition active:scale-95 cursor-pointer"
+            className="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-2xl bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-md flex items-center justify-center text-slate-600 hover:text-slate-900 transition active:scale-95 cursor-pointer shrink-0"
             title="更多操作"
           >
             <MoreHorizontal className="w-4 h-4" />
@@ -998,6 +1032,17 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
           {/* 更多操作浮层菜单 */}
           {showMoreActions && (
             <div className="absolute right-0 top-11 w-44 bg-white/98 backdrop-blur-xl rounded-2xl border border-slate-200/90 shadow-2xl p-1.5 z-40 text-xs text-slate-700 animate-fadeIn">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMoreActions(false);
+                  setIsGlobalSettingsOpen(true);
+                }}
+                className="w-full px-2.5 py-1.5 rounded-xl hover:bg-slate-100 flex items-center gap-2 transition cursor-pointer text-left font-semibold text-slate-800"
+              >
+                <Settings className="w-3.5 h-3.5 text-[#6C4FF6]" />
+                <span>沙盘全局设置</span>
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -1054,6 +1099,7 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
               isWorkspaceEditor={true}
               mapMode={mapMode}
               layerSettings={layerSettings}
+              globalSettings={activeWorkspace?.globalSettings}
             />
       </div>
 
@@ -1285,13 +1331,15 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
           {/* 一键下载纯净地图快捷按钮 */}
           <button
             type="button"
-            onClick={handleDownloadPureMapPng}
+            onClick={() => handleDownloadPureMapPng(mapExportResolution)}
             disabled={isExportingMap}
             className="h-9 px-2.5 rounded-2xl border shadow-md flex items-center gap-1.5 transition active:scale-95 cursor-pointer bg-white/95 backdrop-blur-xl border-slate-200/90 text-slate-700 hover:text-slate-950 text-xs font-semibold disabled:opacity-50"
-            title="下载当前视角下的无UI纯净世界地图 (.png)"
+            title={`下载当前视角 ${mapExportResolution.toUpperCase()} 纯净世界地图 (.png)`}
           >
             <Download className="w-4 h-4 text-slate-600" />
-            <span className="hidden sm:inline">{isExportingMap ? '导出中...' : '下载地图'}</span>
+            <span className="hidden sm:inline">
+              {isExportingMap ? '导出中...' : `下载地图 (${mapExportResolution.toUpperCase()})`}
+            </span>
           </button>
 
           <button
@@ -1302,7 +1350,7 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
                 ? 'bg-[#6C4FF6] border-[#6C4FF6] text-white shadow-indigo-500/20'
                 : 'bg-white/95 backdrop-blur-xl border-slate-200/90 text-slate-700 hover:text-slate-950'
             }`}
-            title={isMapToolsExpanded ? '收起地图工具' : '展开地图工具'}
+            title={isMapToolsExpanded ? '收起地图工具' : '展开地图工具与分辨率设置'}
           >
             <Crosshair className="w-4 h-4 stroke-[2.2]" />
           </button>
@@ -1315,17 +1363,44 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
               initial={{ opacity: 0, scale: 0.95, y: -4 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -4 }}
-              className="w-36 bg-white/98 backdrop-blur-xl border border-slate-200/90 rounded-2xl shadow-2xl p-1.5 flex flex-col gap-1 text-xs text-slate-700"
+              className="w-44 bg-white/98 backdrop-blur-xl border border-slate-200/90 rounded-2xl shadow-2xl p-2 flex flex-col gap-1.5 text-xs text-slate-700"
             >
+              {/* 分辨率分段切换器 */}
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between text-[10px] font-semibold text-slate-500 px-0.5">
+                  <span>导出分辨率</span>
+                  <span className="text-[#6C4FF6] font-mono font-bold">
+                    {mapExportResolution === '8k' ? '7680px' : mapExportResolution === '4k' ? '3840px' : mapExportResolution === '2k' ? '2560px' : '1920px'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 gap-0.5 p-0.5 bg-slate-100 rounded-lg">
+                  {(['1080p', '2k', '4k', '8k'] as const).map((res) => (
+                    <button
+                      key={res}
+                      type="button"
+                      onClick={() => setMapExportResolution(res)}
+                      className={`py-1 text-[10px] font-bold rounded-md transition cursor-pointer text-center ${
+                        mapExportResolution === res
+                          ? 'bg-white text-[#6C4FF6] shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                      title={res === '8k' ? '8K巨幅 (7680px)' : res === '4k' ? '4K极清 (3840px)' : res === '2k' ? '2K超清 (2560px)' : '1080P高清 (1920px)'}
+                    >
+                      {res.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <button
                 type="button"
-                onClick={handleDownloadPureMapPng}
+                onClick={() => handleDownloadPureMapPng(mapExportResolution)}
                 disabled={isExportingMap}
-                className="w-full px-2.5 py-1.5 rounded-xl hover:bg-slate-100 flex items-center gap-2 transition cursor-pointer text-left font-medium text-slate-800 disabled:opacity-50"
-                title="下载当前视角下的无UI纯净世界地图 (.png)"
+                className="w-full px-2.5 py-1.5 rounded-xl bg-[#6C4FF6] hover:bg-[#5B3EE4] text-white flex items-center justify-center gap-1.5 transition cursor-pointer text-xs font-semibold disabled:opacity-50 shadow-xs active:scale-98"
+                title="导出当前视角的无UI纯净世界地图"
               >
-                <Download className="w-3.5 h-3.5 text-slate-600" />
-                <span>{isExportingMap ? '导出中...' : '下载纯净地图'}</span>
+                <Download className="w-3.5 h-3.5 stroke-[2.2]" />
+                <span>{isExportingMap ? '正在导出...' : `下载 ${mapExportResolution.toUpperCase()} 纯净地图`}</span>
               </button>
 
               <div className="w-full h-px bg-slate-100 my-0.5" />
@@ -1364,6 +1439,18 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
               >
                 <Layers className="w-3.5 h-3.5 text-slate-500" />
                 <span>地图图层</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMapToolsExpanded(false);
+                  setIsGlobalSettingsOpen(true);
+                }}
+                className="w-full px-2.5 py-1.5 rounded-xl hover:bg-[#F0ECFF] flex items-center gap-2 transition cursor-pointer text-left text-slate-800 font-semibold"
+              >
+                <Settings className="w-3.5 h-3.5 text-[#6C4FF6]" />
+                <span>沙盘全局设置</span>
               </button>
 
               <button
@@ -2342,6 +2429,30 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
             const nextList = workspaceNations.map((n) => (n.id === updated.id ? updated : n));
             persistNationsUpdate(nextList);
             showToast(`已成功保存【${updated.name}】的档案与国旗设置`);
+          }}
+          showToast={showToast}
+        />
+      )}
+
+      {/* 🌟 沙盘全局设置面板（字体、地块底图颜色、省份数据与名称） */}
+      {activeWorkspace && (
+        <WorkspaceGlobalSettingsModal
+          isOpen={isGlobalSettingsOpen}
+          onClose={() => setIsGlobalSettingsOpen(false)}
+          workspace={activeWorkspace}
+          nations={workspaceNations}
+          onUpdateNations={(updated) => {
+            persistNationsUpdate(updated);
+          }}
+          onUpdateWorkspace={(updates) => {
+            if (!activeWorkspace) return;
+            const updatedWs = workspaceService.updateWorkspace(activeWorkspace.id, updates);
+            setActiveWorkspace(updatedWs);
+          }}
+          onLocateProvince={(provId, provName) => {
+            setIsGlobalSettingsOpen(false);
+            const cn = getProvinceChineseName(provName || provId);
+            showToast(`已锁定省份【${cn}】(#${provId})`);
           }}
           showToast={showToast}
         />

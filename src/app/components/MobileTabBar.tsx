@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { workspaceService, MAX_CREATOR_WORKSPACES } from '../services/workspaceService';
 
 interface MobileTabBarProps {
   activeTab: 'lobby' | 'my_nation' | 'world_map' | 'admin' | 'national_focus' | 'workspace' | string;
@@ -81,6 +82,19 @@ export const MobileTabBar: React.FC<MobileTabBarProps> = ({
         })
       );
       window.dispatchEvent(new CustomEvent('open-auth-register'));
+      return;
+    }
+
+    // 先看创作者的工作区位置是否有空位，如果没有则无法进入页面
+    const quota = workspaceService.canCreateWorkspace(user?.id);
+    if (!quota.allowed) {
+      window.dispatchEvent(
+        new CustomEvent('app-toast', {
+          detail: {
+            message: `自建工作区配额已满（${quota.currentCount}/${MAX_CREATOR_WORKSPACES}），无法进入创建页面，请先删除部分已有工作区以释放名额`,
+          },
+        })
+      );
       return;
     }
 

@@ -684,7 +684,7 @@ export const DecreeAndCabinetModal: React.FC<DecreeAndCabinetModalProps> = ({
           {activeTab === 'cabinet' && (
             <div className="space-y-4">
               <p className="text-xs text-slate-500 leading-relaxed">
-                为四大核心职务委任内阁大臣。每位大臣具备专属执政特质（Trait），直接提供常驻国家加成。
+                为四大核心职务委任内阁大臣。每位大臣具备专属执政特质，直接提供常驻国家加成。
               </p>
 
               {(['defense', 'finance', 'foreign', 'industry'] as const).map((role) => {

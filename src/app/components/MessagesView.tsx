@@ -87,7 +87,7 @@ const INITIAL_MESSAGES: DispatchMessage[] = [
     senderName: '南风王国外务总省',
     time: '16:03',
     summary: '已向你发送 同盟邀请',
-    content: `【最高同盟公约缔结公文】\n\n尊敬的执政阁下：\n\n南风王国正式向贵国递交同盟公约缔结照会！\n\n根据推演公约法案，同盟规模上限严格限制为最多 3 个国家。若完成签署，同盟双方将享有：\n- 全域共同防御：任一盟友遭受侵略将自动触发防卫义务；\n- 边境免除关税与战略资源互补调配；\n- 联合参谋部作战经验值（XP）互通共享。\n\n请阁下在战略决策中审议批准。`,
+    content: `【最高同盟公约缔结公文】\n\n尊敬的执政阁下：\n\n南风王国正式向贵国递交同盟公约缔结照会！\n\n根据推演公约法案，同盟规模上限严格限制为最多 3 个国家。若完成签署，同盟双方将享有：\n- 全域共同防御：任一盟友遭受侵略将自动触发防卫义务；\n- 边境免除关税与战略资源互补调配；\n- 联合参谋部作战经验值互通共享。\n\n请阁下在战略决策中审议批准。`,
     hasRedDot: true,
     isAllianceInvite: true,
     avatarType: 'lion',
@@ -524,66 +524,52 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
   ];
 
   return (
-    <div className="flex-1 w-full bg-[#f8fafc] text-slate-800 min-h-screen pb-24 select-none relative overflow-x-hidden">
-      {/* 顶部右侧世界地图浅色水印（精准还原图顶淡雅地形图纹理） */}
-      <div
-        aria-hidden="true"
-        className="absolute top-0 right-0 w-80 h-52 pointer-events-none opacity-20 overflow-hidden"
-      >
-        <svg viewBox="0 0 400 240" className="w-full h-full text-slate-500 fill-current">
-          <path
-            d="M 60 30 Q 100 20 140 38 T 210 35 Q 260 25 300 45 T 370 40 Q 390 65 360 85 T 300 105 Q 260 135 220 125 T 160 115 Q 120 105 80 70 Z"
-            opacity="0.45"
-          />
-          <path
-            d="M 220 50 Q 270 42 320 65 T 370 95 Q 350 135 310 145 T 250 125 Q 220 95 220 50 Z"
-            opacity="0.35"
-          />
-          <path
-            d="M 110 110 Q 140 120 150 160 T 120 200 Q 90 190 100 140 Z"
-            opacity="0.4"
-          />
-          <path
-            d="M 260 130 Q 310 140 320 180 T 280 210 Q 250 190 260 130 Z"
-            opacity="0.3"
-          />
-        </svg>
-      </div>
-
-      <div className="max-w-md mx-auto px-4 pt-3 sm:pt-4">
-        {/* 1. 顶部品牌栏与操作入口：FC · FANS CONQUEST + 搜索与更多按钮 */}
-        <header className="flex items-start justify-between relative z-10 pt-1 pb-3">
+    <div className="flex-1 w-full bg-white text-slate-800 min-h-screen pb-24 select-none">
+      <div className="w-full">
+        {/* 顶部主功能栏：铺满全屏，两边无间距 */}
+        <header className="w-full flex items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-slate-200/80 bg-white sticky top-0 z-20">
           <div>
-            <div className="text-xl font-extrabold tracking-tight text-slate-900 leading-none">
-              FC
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                消息
+              </h1>
+              {totalUnreadCount > 0 ? (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-100">
+                  {totalUnreadCount} 条未读
+                </span>
+              ) : (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-slate-400 bg-slate-100">
+                  全部已读
+                </span>
+              )}
             </div>
-            <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase mt-0.5">
-              FANS CONQUEST
-            </div>
-            <div className="text-[11px] text-slate-400 mt-0.5">
-              连接世界 · 书写属于你的时代
-            </div>
+            <p className="text-xs text-slate-500 mt-0.5">国家事务、外交信函与系统通报</p>
           </div>
 
-          {/* 右侧搜索与更多图标按钮 */}
-          <div className="flex items-center gap-2">
+          {/* 右侧操作区：搜索、更多 */}
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={() => setSearchOpen(!searchOpen)}
-              className="w-8 h-8 rounded-full bg-slate-100/90 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition cursor-pointer active:scale-95 shadow-2xs"
+              className={`h-8 px-2.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition cursor-pointer active:scale-95 ${
+                searchOpen
+                  ? 'bg-blue-50 text-blue-600 border-blue-200'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
               title="搜索消息"
             >
-              <Search className="w-4 h-4 stroke-[2.2]" />
+              <Search className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">搜索</span>
             </button>
 
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setMoreMenuOpen(!moreMenuOpen)}
-                className="w-8 h-8 rounded-full bg-slate-100/90 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition cursor-pointer active:scale-95 shadow-2xs"
+                className="w-8 h-8 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 flex items-center justify-center transition cursor-pointer active:scale-95"
                 title="更多操作"
               >
-                <MoreHorizontal className="w-4 h-4 stroke-[2.2]" />
+                <MoreHorizontal className="w-4 h-4" />
               </button>
 
               {/* 更多菜单浮层 */}
@@ -593,7 +579,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                     initial={{ opacity: 0, scale: 0.95, y: -4 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: -4 }}
-                    className="absolute right-0 mt-1.5 w-44 rounded-2xl bg-white border border-slate-200/90 shadow-xl py-1.5 z-30 text-xs font-medium"
+                    className="absolute right-0 mt-1.5 w-44 rounded-xl bg-white border border-slate-200 shadow-lg py-1 z-30 text-xs font-medium"
                   >
                     <button
                       type="button"
@@ -602,18 +588,6 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                     >
                       <CheckCheck className="w-3.5 h-3.5 text-blue-600" />
                       <span>全部标为已读</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMoreMenuOpen(false);
-                        setIsComposeModalOpen(true);
-                      }}
-                      className="w-full px-3.5 py-2 text-left hover:bg-slate-50 flex items-center gap-2 text-slate-700 cursor-pointer"
-                    >
-                      <Send className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>起草通报牒文</span>
                     </button>
 
                     <button
@@ -641,17 +615,17 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden pb-3"
+              className="overflow-hidden px-4 sm:px-6 py-2.5 border-b border-slate-100 bg-slate-50/50"
             >
-              <div className="relative">
+              <div className="relative w-full">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={searchKeyword}
                   onChange={(e) => setSearchKeyword(e.target.value)}
-                  placeholder="搜索消息、国家、外交公文..."
+                  placeholder="搜索消息标题、发函国、正文关键词..."
                   autoFocus
-                  className="w-full pl-9 pr-8 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800 placeholder-slate-400"
+                  className="w-full pl-9 pr-8 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 shadow-2xs text-slate-800 placeholder-slate-400"
                 />
                 {searchKeyword && (
                   <button
@@ -667,29 +641,8 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
           )}
         </AnimatePresence>
 
-        {/* 2. 主标题与诗意寄语行（消息 · 来自世界的回响 + 历史长河名言） */}
-        <div className="flex items-start justify-between pt-1 pb-4 gap-3 relative z-10">
-          <div>
-            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
-              消息
-            </h1>
-            <p className="text-sm text-slate-400 mt-0.5">来自世界的回响</p>
-          </div>
-
-          {/* 右侧诗性长言：“在历史的长河中 每一次交流，都可能改变世界。” */}
-          <div className="text-right max-w-[170px] pt-1">
-            <p className="text-[11px] text-slate-400 leading-relaxed font-normal tracking-wide">
-              “ 在历史的长河中
-              <br />
-              每一次交流，
-              <br />
-              都可能改变世界。”
-            </p>
-          </div>
-        </div>
-
-        {/* 3. 分类胶囊按钮栏（全部 5 · 私人 · 外交 · 系统 · 国家事务） */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 pb-3 relative z-10">
+        {/* 分类胶囊标签栏 */}
+        <div className="w-full px-4 sm:px-6 flex items-center gap-2 overflow-x-auto no-scrollbar py-2.5 border-b border-slate-100 bg-white">
           {FILTER_PILLS.map((pill) => {
             const Icon = pill.icon;
             const isActive = activeCategory === pill.id;
@@ -699,18 +652,18 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                 key={pill.id}
                 type="button"
                 onClick={() => setActiveCategory(pill.id as MessageCategory)}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer select-none active:scale-95 ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer select-none active:scale-95 ${
                   isActive
-                    ? 'bg-[#3B82F6] text-white shadow-xs'
-                    : 'bg-white text-slate-700 border border-slate-200/80 hover:bg-slate-50'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100/80 hover:text-slate-900'
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-slate-600'}`} />
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-slate-500'}`} />
                 <span>{pill.label}</span>
                 {pill.count !== undefined && pill.count > 0 && (
                   <span
                     className={`ml-0.5 text-[11px] font-bold px-1.5 py-0.2 rounded-full ${
-                      isActive ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-600'
+                      isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
                     }`}
                   >
                     {pill.count}
@@ -721,14 +674,14 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
           })}
         </div>
 
-        {/* 4. 消息列表 */}
-        <div className="space-y-2.5 pt-1">
+        {/* 4. 消息列表（两边无距离、铺满全屏、长方形列表，对话之间 0 距离） */}
+        <div className="w-full bg-white divide-y divide-slate-100 border-b border-slate-200">
           {filteredMessages.length === 0 ? (
-            <div className="py-12 text-center bg-white rounded-2xl border border-slate-100 p-6 shadow-2xs">
-              <Mail className="w-10 h-10 text-slate-300 mx-auto mb-2 stroke-[1.5]" />
+            <div className="w-full py-16 text-center px-4">
+              <Mail className="w-9 h-9 text-slate-300 mx-auto mb-2 stroke-[1.5]" />
               <div className="text-xs font-bold text-slate-700">当前分类暂无相关消息</div>
               <p className="text-[11px] text-slate-400 mt-1">
-                点击右上角“更多”起草新牒文，向全域或特定国家发送信函
+                当前分类下暂无新的来信或通报
               </p>
             </div>
           ) : (
@@ -737,21 +690,21 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                 <div
                   key={msg.id}
                   onClick={() => handleOpenMessage(msg)}
-                  className="p-3.5 rounded-2xl bg-white border border-slate-100/90 hover:border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-all cursor-pointer flex items-center justify-between gap-3 active:scale-[0.99]"
+                  className="w-full px-4 sm:px-6 py-3.5 bg-white hover:bg-slate-50 transition-colors cursor-pointer flex items-center justify-between gap-3 active:bg-slate-100/70"
                 >
                   {/* 左侧：头像 */}
                   <MessageAvatar type={msg.avatarType} isOnline={msg.isOnline} />
 
                   {/* 中间：标题与内容预览 */}
                   <div className="flex-1 min-w-0 pr-1">
-                    <div className="text-sm font-bold text-slate-900 truncate">
+                    <div className="text-sm font-semibold text-slate-900 truncate">
                       {msg.title}
                     </div>
 
-                    <div className="flex items-center gap-1.5 mt-1 text-xs truncate">
+                    <div className="flex items-center gap-1.5 mt-0.5 text-xs truncate">
                       {/* 分类标签 */}
                       <span
-                        className={`text-[11px] font-medium px-2 py-0.2 rounded-full shrink-0 ${
+                        className={`text-[10px] font-medium px-1.5 py-0.2 rounded shrink-0 ${
                           msg.category === 'diplomacy'
                             ? 'bg-[#EEF4FF] text-[#3B82F6]'
                             : msg.category === 'private'
@@ -765,7 +718,7 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                       </span>
 
                       {/* 内容文案 */}
-                      <span className="text-slate-500 truncate">
+                      <span className="text-slate-500 truncate text-xs">
                         {msg.isAllianceInvite ? (
                           <>
                             已向你发送{' '}
@@ -779,14 +732,14 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
                   </div>
 
                   {/* 右侧：时间与未读红点/角标 */}
-                  <div className="flex flex-col items-end justify-between h-11 shrink-0">
+                  <div className="flex flex-col items-end justify-between h-10 shrink-0">
                     <span className="text-[11px] text-slate-400 font-normal">
                       {msg.time}
                     </span>
 
-                    <div className="h-5 flex items-center justify-end">
+                    <div className="h-4 flex items-center justify-end">
                       {msg.unreadCount !== undefined && msg.unreadCount > 0 ? (
-                        <span className="w-5 h-5 rounded-full bg-[#3B82F6] text-white text-xs font-bold flex items-center justify-center font-sans shadow-2xs">
+                        <span className="min-w-4 h-4 px-1 rounded-full bg-[#3B82F6] text-white text-[10px] font-bold flex items-center justify-center font-sans shadow-2xs">
                           {msg.unreadCount}
                         </span>
                       ) : msg.hasRedDot ? (
@@ -799,18 +752,18 @@ export const MessagesView: React.FC<MessagesViewProps> = ({
             })
           )}
 
-          {/* 5. 底部入口：已归档的消息（完全还原参考图底部入口） */}
+          {/* 5. 底部入口：已归档的消息 */}
           <div
             onClick={() => setIsArchiveModalOpen(true)}
-            className="p-3.5 rounded-2xl bg-white border border-slate-100/90 hover:border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-all cursor-pointer flex items-center justify-between gap-3 active:scale-[0.99] mt-3"
+            className="w-full px-4 sm:px-6 py-3.5 bg-slate-50/50 hover:bg-slate-100/70 transition-colors cursor-pointer flex items-center justify-between gap-3 active:bg-slate-100"
           >
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-11 h-11 rounded-2xl bg-slate-100/90 text-slate-500 flex items-center justify-center shrink-0">
-                <Archive className="w-5 h-5 stroke-[1.8]" />
+              <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center shrink-0">
+                <Archive className="w-4 h-4 stroke-[1.8]" />
               </div>
               <div className="min-w-0">
-                <div className="text-sm font-bold text-slate-900">已归档的消息</div>
-                <div className="text-[11px] text-slate-400 mt-0.5">查看已归档的历史消息</div>
+                <div className="text-sm font-semibold text-slate-800">已归档的消息</div>
+                <div className="text-xs text-slate-400 mt-0.5">查看已归档的历史消息</div>
               </div>
             </div>
 

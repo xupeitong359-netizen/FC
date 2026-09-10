@@ -259,18 +259,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </button>
 
-            {/* Quick Settings & Debug Modal Button */}
-            {onOpenSettings && (
-              <button
-                type="button"
-                onClick={onOpenSettings}
-                className="w-8 h-8 rounded-full bg-white hover:bg-slate-100 border border-slate-200/90 text-slate-600 hover:text-indigo-600 flex items-center justify-center transition-all shadow-2xs cursor-pointer"
-                title="系统设置与推演调试"
-                aria-label="系统设置与推演调试"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
-            )}
+
 
             {/* User Avatar & Login/Register Buttons (2-character pure text: 登录 / 注册) */}
             {isAuthenticated ? (

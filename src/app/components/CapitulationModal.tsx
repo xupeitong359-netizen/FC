@@ -65,7 +65,7 @@ export const CapitulationModal: React.FC<CapitulationModalProps> = ({
      {/* Key Parties */}
      <div className="grid grid-cols-2 gap-3 text-xs">
       <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
-       <span className="text-[10px] text-slate-400 block uppercase font-bold">战胜国 (Victor)</span>
+       <span className="text-[10px] text-slate-400 block uppercase font-bold">战胜国</span>
        <span className="font-extrabold text-sm text-emerald-600 dark:text-emerald-400 block mt-0.5">
         {resolution.victorNationName}
        </span>
@@ -73,7 +73,7 @@ export const CapitulationModal: React.FC<CapitulationModalProps> = ({
       </div>
 
       <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
-       <span className="text-[10px] text-slate-400 block uppercase font-bold">战败投降国 (Capitulated)</span>
+       <span className="text-[10px] text-slate-400 block uppercase font-bold">战败投降国</span>
        <span className="font-extrabold text-sm text-rose-600 dark:text-rose-400 block mt-0.5">
         {resolution.capitulatedNationName}
        </span>
@@ -85,7 +85,7 @@ export const CapitulationModal: React.FC<CapitulationModalProps> = ({
      <div className="space-y-3">
       <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
        <Scale className="w-3.5 h-3.5 text-indigo-500" />
-       <span>条约法定执行条款 (Binding Settlement Terms)</span>
+       <span>条约法定执行条款</span>
       </h4>
 
       <div className="space-y-2 text-xs">

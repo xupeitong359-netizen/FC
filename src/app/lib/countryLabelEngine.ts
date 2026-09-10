@@ -676,9 +676,100 @@ export function getNationLabelSpine(
 }
 
 /**
+ * Ensures the SVG path definition has sufficient length to accommodate the full text label.
+ * Symmetrically extends straight lines or Quadratic Bézier curves along their exact tangents/trajectories,
+ * ensuring the geometric center (startOffset="50%") remains perfectly invariant and no glyphs are clipped by the SVG engine.
+ */
+export function extendPathToSufficientLength(
+  pathD: string,
+  minRequiredLength: number,
+  center: PixelPoint
+): string {
+  if (!pathD || !pathD.trim()) {
+    const halfW = Math.max(10, minRequiredLength / 2);
+    return `M ${(center[0] - halfW).toFixed(2)} ${center[1].toFixed(2)} L ${(center[0] + halfW).toFixed(2)} ${center[1].toFixed(2)}`;
+  }
+
+  // 1. Quadratic Bézier curve: M x0 y0 Q qx qy x1 y1
+  const quadMatch = pathD.match(/^M\s*([-\d.]+)\s+([-\d.]+)\s+Q\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)$/i);
+  if (quadMatch) {
+    const x0 = parseFloat(quadMatch[1]);
+    const y0 = parseFloat(quadMatch[2]);
+    const qx = parseFloat(quadMatch[3]);
+    const qy = parseFloat(quadMatch[4]);
+    const x1 = parseFloat(quadMatch[5]);
+    const y1 = parseFloat(quadMatch[6]);
+
+    const p0: PixelPoint = [x0, y0];
+    const q: PixelPoint = [qx, qy];
+    const pn: PixelPoint = [x1, y1];
+
+    const chord1 = Math.hypot(qx - x0, qy - y0);
+    const chord2 = Math.hypot(x1 - qx, y1 - qy);
+    const baseline = Math.hypot(x1 - x0, y1 - y0);
+    const curLen = Math.max(0.001, (baseline + chord1 + chord2) / 2);
+
+    if (curLen < minRequiredLength) {
+      const textExt = (minRequiredLength - curLen) / (2 * curLen);
+      const evalB = (t: number): PixelPoint => [
+        (1 - t) * (1 - t) * p0[0] + 2 * (1 - t) * t * q[0] + t * t * pn[0],
+        (1 - t) * (1 - t) * p0[1] + 2 * (1 - t) * t * q[1] + t * t * pn[1],
+      ];
+
+      const p0New = evalB(-textExt);
+      const pnNew = evalB(1 + textExt);
+      const bMid = evalB(0.5);
+      const qNew: PixelPoint = [
+        2 * bMid[0] - 0.5 * (p0New[0] + pnNew[0]),
+        2 * bMid[1] - 0.5 * (p0New[1] + pnNew[1]),
+      ];
+
+      return `M ${p0New[0].toFixed(2)} ${p0New[1].toFixed(2)} Q ${qNew[0].toFixed(2)} ${qNew[1].toFixed(2)} ${pnNew[0].toFixed(2)} ${pnNew[1].toFixed(2)}`;
+    }
+    return pathD;
+  }
+
+  // 2. Straight line: M x0 y0 L x1 y1
+  const lineMatch = pathD.match(/^M\s*([-\d.]+)\s+([-\d.]+)\s+L\s*([-\d.]+)\s+([-\d.]+)$/i);
+  if (lineMatch) {
+    const x0 = parseFloat(lineMatch[1]);
+    const y0 = parseFloat(lineMatch[2]);
+    const x1 = parseFloat(lineMatch[3]);
+    const y1 = parseFloat(lineMatch[4]);
+
+    let dx = x1 - x0;
+    let dy = y1 - y0;
+    let curLen = Math.hypot(dx, dy);
+
+    if (curLen < 0.001) {
+      dx = 1;
+      dy = 0;
+      curLen = 1;
+    }
+
+    if (curLen < minRequiredLength) {
+      const ux = dx / curLen;
+      const uy = dy / curLen;
+      const extra = (minRequiredLength - curLen) / 2;
+      const x0New = x0 - ux * extra;
+      const y0New = y0 - uy * extra;
+      const x1New = x1 + ux * extra;
+      const y1New = y1 + uy * extra;
+      return `M ${x0New.toFixed(2)} ${y0New.toFixed(2)} L ${x1New.toFixed(2)} ${y1New.toFixed(2)}`;
+    }
+    return pathD;
+  }
+
+  // 3. Fallback: centered horizontal line
+  const halfW = Math.max(10, minRequiredLength / 2);
+  return `M ${(center[0] - halfW).toFixed(2)} ${center[1].toFixed(2)} L ${(center[0] + halfW).toFixed(2)} ${center[1].toFixed(2)}`;
+}
+
+/**
  * Computes dynamic country labels that truly respond to territory geometry:
  * Width expands across territory span, characters bend along curved spines,
- * and overseas colonies/exclaves possess independent country name labels alongside the homeland.
+ * overseas colonies/exclaves possess independent country name labels alongside the homeland,
+ * and names are guaranteed to never be clipped or missing characters in SVG textPath.
  */
 export function computeDynamicCountryLabels(
   nations: Nation[],
@@ -692,7 +783,8 @@ export function computeDynamicCountryLabels(
   }>,
   provinceOwnership: Map<number | string, Nation>,
   projection: any,
-  zoom: number
+  zoom: number,
+  fontScaleMultiplier: number = 1.0
 ): RenderableCountryLabel[] {
   if (!nations.length || !precalculatedFeatures.length) return [];
 
@@ -721,7 +813,8 @@ export function computeDynamicCountryLabels(
     const displayText = cleanName.toUpperCase();
     const hasCJK = /[\u4e00-\u9fa5\u3040-\u30ff]/.test(displayText);
     const charCount = Math.max(1, displayText.length);
-    const charWidthRatio = hasCJK ? 1.05 : 0.62;
+    // CJK characters require generous em width accounting for bold stroke & font advances
+    const charWidthRatio = hasCJK ? 1.15 : 0.68;
 
     // Partition the nation's owned territory into homeland & overseas clusters
     const clusters = partitionNationClusters(nation, owned);
@@ -757,54 +850,102 @@ export function computeDynamicCountryLabels(
       const minDim = Math.min(bounds.width, bounds.height);
       const areaRadius = Math.sqrt(mainLandmassArea / Math.PI);
 
+      // 大国/超级大国疆域体量综合评估（基于核心陆地面积、所辖省份数或对角跨度）
+      const isHugeEmpire = provCount >= 8 || mainLandmassArea >= 50000 || diagonal >= 80 || curveLength >= 80;
+      const isLargeNation = isHugeEmpire || provCount >= 3 || mainLandmassArea >= 15000 || diagonal >= 38 || curveLength >= 36;
+
       // Calculate maximum permitted font height based on regional clearance and corridor width
       const effectiveCorridor = Math.max(
-        clearance * 1.7,
-        areaRadius * 0.60,
-        minDim * 0.36
+        clearance * (isHugeEmpire ? 2.4 : isLargeNation ? 2.0 : 1.6),
+        areaRadius * (isHugeEmpire ? 0.90 : isLargeNation ? 0.78 : 0.55),
+        minDim * (isHugeEmpire ? 0.50 : isLargeNation ? 0.42 : 0.32)
       );
-      const maxFontSizeByHeight = Math.max(1.5, effectiveCorridor * 0.72);
+      const maxFontSizeByHeight = Math.max(1.5, effectiveCorridor * (isHugeEmpire ? 1.0 : isLargeNation ? 0.90 : 0.70));
 
       // Calculate maximum permitted font width to ensure condensed characters + base spacing fit within the spine length
       const maxFontSizeByWidth = Math.max(
         1.4,
-        (curveLength * 0.82) / Math.max(1, charCount * (charWidthRatio + 0.18))
+        (curveLength * (isHugeEmpire ? 0.92 : isLargeNation ? 0.86 : 0.78)) /
+          Math.max(1, charCount * (charWidthRatio + (isHugeEmpire ? 0.28 : isLargeNation ? 0.18 : 0.08)))
       );
 
       // Dynamic grand strategy sizing driven by cluster area, province count, and geographic span:
-      const areaScale = Math.sqrt(mainLandmassArea) * 0.085;
-      const provinceScale = Math.sqrt(provCount) * 1.65 + (provCount >= 8 ? (provCount - 8) * 0.35 : 0);
-      const spanScale = (curveLength / Math.max(1, charCount * charWidthRatio)) * 0.56;
-      const targetGrandSize = Math.max(1.6 + provinceScale, areaScale, spanScale, diagonal * 0.055);
+      const largeBoost = isHugeEmpire ? 1.90 : isLargeNation ? 1.45 : 1.0;
+      const areaScale = Math.sqrt(mainLandmassArea) * (isHugeEmpire ? 0.15 : isLargeNation ? 0.115 : 0.08);
+      const provinceScale = (Math.sqrt(provCount) * 1.8 + (provCount >= 5 ? (provCount - 5) * 0.45 : 0)) * largeBoost;
+      const spanScale = (curveLength / Math.max(1, charCount * charWidthRatio)) * (isHugeEmpire ? 0.82 : isLargeNation ? 0.68 : 0.52);
+      const targetGrandSize = Math.max(1.6 + provinceScale, areaScale, spanScale, diagonal * (isHugeEmpire ? 0.105 : isLargeNation ? 0.080 : 0.050));
 
       // Constrain font size within fitting territory geometry
       let fontSize = Math.min(targetGrandSize, maxFontSizeByHeight, maxFontSizeByWidth);
 
-      // Ensure safe bounds
-      fontSize = Math.max(1.5, Math.min(18.0, fontSize));
+      // 显著提升大国国名允许的字号上限
+      const maxLimit = isHugeEmpire ? 38.0 : isLargeNation ? 28.0 : 16.0;
+      fontSize = Math.max(1.5, Math.min(maxLimit, fontSize));
 
       // Subtle scale-up on zoom to maintain readability
       fontSize *= (1.0 + Math.log2(Math.max(1, zoom)) * 0.035);
-      fontSize = Math.min(fontSize, 20.0);
+      fontSize = Math.min(fontSize, isHugeEmpire ? 42.0 : isLargeNation ? 32.0 : 18.0);
 
-      // Moderate, balanced tracking
-      const baseTrackingRatio = hasCJK ? 0.22 : 0.28;
-      const baseSpacing = Math.max(0.3, fontSize * baseTrackingRatio);
+      // Apply external fontScaleMultiplier if configured in workspace global settings
+      if (fontScaleMultiplier && fontScaleMultiplier !== 1.0) {
+        fontSize = Math.max(1.5, fontSize * fontScaleMultiplier);
+      }
+
+      // Safe available span along the territory spine
+      const safeTerritorySpan = Math.max(curveLength * 0.90, diagonal * 0.65);
+
+      // If raw font size would exceed territory length even without tracking, downscale to fit comfortably
+      const minGlyphSpan = charCount * (fontSize * charWidthRatio);
+      if (minGlyphSpan > safeTerritorySpan && safeTerritorySpan > 8) {
+        const fittingSize = safeTerritorySpan / (charCount * charWidthRatio);
+        fontSize = Math.max(1.5, fittingSize);
+      }
+
+      // Tracking / Letter Spacing:
+      // Controlled tracking that lets large nations breathe across expansive territory,
+      // while preventing text from ever exceeding the spine or clipping glyphs
+      const baseTrackingRatio = isHugeEmpire
+        ? (hasCJK ? 0.45 : 0.70)
+        : isLargeNation
+        ? (hasCJK ? 0.25 : 0.45)
+        : (hasCJK ? 0.08 : 0.15);
+
+      const baseSpacing = Math.max(0.2, fontSize * baseTrackingRatio);
       const compactTextWidth = charCount * (fontSize * charWidthRatio) + (charCount - 1) * baseSpacing;
-      const extraSpace = Math.max(0, curveLength * 0.85 - compactTextWidth);
+      const extraSpace = Math.max(0, safeTerritorySpan - compactTextWidth);
 
       const distributedExtra = charCount > 1 ? extraSpace / (charCount - 1) : 0;
-      const maxTrackingLimit = fontSize * (hasCJK ? 0.45 : 0.60);
-      const letterSpacing = charCount > 1
-        ? Math.min(maxTrackingLimit, baseSpacing + distributedExtra * 0.55)
+      const maxTrackingLimit = fontSize * (
+        isHugeEmpire
+          ? (hasCJK ? 1.20 : 1.80)
+          : isLargeNation
+          ? (hasCJK ? 0.75 : 1.20)
+          : (hasCJK ? 0.25 : 0.40)
+      );
+
+      let letterSpacing = charCount > 1
+        ? Math.min(maxTrackingLimit, baseSpacing + distributedExtra * (isHugeEmpire ? 0.75 : isLargeNation ? 0.65 : 0.45))
         : 0;
 
-      let finalPathD = pathD;
-      const totalLabelSpan = charCount * (fontSize * charWidthRatio) + (charCount - 1) * letterSpacing;
-      if (!finalPathD || curveLength < fontSize) {
-        const halfW = totalLabelSpan / 2;
-        finalPathD = `M ${center[0] - halfW} ${center[1]} L ${center[0] + halfW} ${center[1]}`;
+      // Strict guarantee: the total rendered label width must never overflow safe territory bounds
+      if (charCount > 1) {
+        const totalWithSpacing = charCount * (fontSize * charWidthRatio) + (charCount - 1) * letterSpacing;
+        if (totalWithSpacing > safeTerritorySpan) {
+          const maxAllowedSpacing = Math.max(0, (safeTerritorySpan - charCount * (fontSize * charWidthRatio)) / (charCount - 1));
+          letterSpacing = Math.min(letterSpacing, maxAllowedSpacing);
+        }
       }
+
+      const totalLabelSpan = charCount * (fontSize * charWidthRatio) + (charCount - 1) * letterSpacing;
+
+      // CRITICAL BULLETPROOF FIX FOR SVG TEXTPATH CLIPPING:
+      // SVG textPath will discard any characters whose positions fall outside [0, pathLength].
+      // When startOffset="50%", text extends symmetrically from the midpoint.
+      // We unconditionally ensure that the underlying path is extended with ample margin on both ends,
+      // completely guaranteeing that no glyphs are ever clipped or dropped anywhere on the map!
+      const requiredPathLength = Math.max(curveLength, totalLabelSpan * 1.5 + 40);
+      const finalPathD = extendPathToSufficientLength(pathD, requiredPathLength, center);
 
       const sanitizedId = nation.id.replace(/[^a-zA-Z0-9_-]/g, '_');
       const pathId = `label-spine-${sanitizedId}-${clusterIndex}`;
@@ -818,7 +959,7 @@ export function computeDynamicCountryLabels(
         fontSize,
         letterSpacing,
         opacity: 1,
-        curveLength,
+        curveLength: requiredPathLength,
         curvature,
       });
     });

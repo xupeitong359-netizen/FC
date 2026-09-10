@@ -64,7 +64,7 @@ export const TECH_BRANCHES: Record<TechBranchType, TechBranchMeta> = {
   iconName: 'fighter',
   color: '#60a5fa',
   accentColor: 'text-blue-400 border-blue-500/40 bg-blue-950/40',
-  description: '全金属空优战斗机、近距离对地支援机(CAS)、战术与重型远程战略轰炸机、喷气战机',
+  description: '全金属空优战斗机、近距离对地支援机、战术与重型远程战略轰炸机、喷气战机',
  },
  naval: {
   id: 'naval',
@@ -606,7 +606,7 @@ export const ALL_RESEARCH_TECHS: ResearchTechItem[] = [
   artKey: 'aa_gun',
   baseDays: 95,
   summary: '装备 20mm/37mm 高射速机关炮，防御俯冲轰炸与低空袭扰',
-  effects: ['防空火力 +20%', '地面部队受近距对地支援机(CAS)轰炸损耗 -30%'],
+  effects: ['防空火力 +20%', '地面部队受近距对地支援机轰炸损耗 -30%'],
   stats: { '防空射击': '+20', '低空拦截': '+35%' },
  },
  {
@@ -759,7 +759,7 @@ export const ALL_RESEARCH_TECHS: ResearchTechItem[] = [
  },
  {
   id: 'arm_medium_4',
-  name: '现代化主战坦克(MBT)',
+  name: '现代化主战坦克',
   branch: 'armor',
   tier: 4,
   col: 3,

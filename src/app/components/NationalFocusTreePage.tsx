@@ -918,7 +918,7 @@ export const NationalFocusTreePage: React.FC<NationalFocusTreePageProps> = ({
                 transition: 'transform 0.15s ease-out',
               }}
             >
-              {/* 1. Level 0: 顶层战略决策 (Root Tier 1936 Decision) */}
+              {/* 1. Level 0: 顶层战略决策 */}
               <div className="flex flex-col items-center relative mb-4">
                 <NationalFocusNodeCard
                   iconType={rootNode.iconType}
@@ -992,7 +992,7 @@ export const NationalFocusTreePage: React.FC<NationalFocusTreePageProps> = ({
                 )}
               </div>
 
-              {/* 4. Level 4: 终极战略超级工程 (Tier IV Super-Projects) */}
+              {/* 4. Level 4: 终极战略超级工程 */}
               <div
                 className={`w-full max-w-[1500px] mt-4 pt-6 border-t-2 border-dashed border-[#78350f]/50 flex flex-col items-center transition-all duration-300 ${
                   activeBranch !== 'all' && activeBranch !== 'tier4' ? 'opacity-30 blur-[0.5px]' : 'opacity-100'
@@ -1001,7 +1001,7 @@ export const NationalFocusTreePage: React.FC<NationalFocusTreePageProps> = ({
                 <div className="flex items-center gap-2 mb-6 bg-[#2d3748] px-4 py-1.5 rounded-lg border border-amber-500/50 shadow-md">
                   <Sparkles className="w-4 h-4 text-amber-400" />
                   <h3 className="text-xs font-black text-amber-300 tracking-wider font-serif uppercase">
-                    国家终极战略超级工程 (Tier IV Strategic Super-Projects)
+                    国家终极战略超级工程
                   </h3>
                   <Sparkles className="w-4 h-4 text-amber-400" />
                 </div>

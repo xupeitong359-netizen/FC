@@ -1,53 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X,
   Sparkles,
   ChevronRight,
   ChevronLeft,
-  ChevronDown,
   Check,
-  Globe2,
   Shield,
   Layers,
   BookOpen,
   SlidersHorizontal,
   Flame,
-  Zap,
-  Lock,
-  Eye,
   Crown,
-  Share2,
   AlertCircle,
   Compass,
   Users,
-  Trophy,
-  Activity,
-  ShieldCheck,
   Landmark,
   Anchor,
   Swords,
   Target,
   Feather,
-  Flag,
   Castle,
-  Info,
-  LayoutGrid,
-  ShieldAlert,
-  Crosshair,
-  Navigation,
-  Scale,
-  Scroll,
-  Award,
-  Map,
-  MapPin,
-  Ship,
-  Mountain,
-  Cog,
-  Radio,
-  Sun,
+  Trash2,
+  Upload,
   Plus,
-  Minus,
+  Scale,
+  Flag,
+  RotateCcw,
+  Building2,
+  Factory,
 } from 'lucide-react';
 import {
   workspaceService,
@@ -55,6 +36,14 @@ import {
   WorkspaceRulesConfig,
   MAX_CREATOR_WORKSPACES,
 } from '../services/workspaceService';
+import { Nation, FlagRatio } from '../types';
+import { ScenarioTimeMatrixPicker } from './ScenarioTimeMatrixPicker';
+import {
+  FLAG_RATIO_OPTIONS,
+  PRESET_FLAG_PALETTES,
+  REGIME_OPTIONS,
+} from './QuickNationCreateModal';
+import { NationFlagDisplay, getAspectRatioCSS } from './NationFlagDisplay';
 
 interface WorkspaceCreationWizardProps {
   isOpen: boolean;
@@ -67,65 +56,20 @@ interface WorkspaceCreationWizardProps {
 
 const PRESET_ERAS = ['1936年', '1939年', '1942—1945年', '冷战时期', '21世纪初', '近未来', '架空纪元'];
 
-// 常用首屏 12 款徽标（与设计稿严格对齐：第一行7个，第二行5个）
+// 常用首屏 12 款徽标
 const PRIMARY_TOTEMS = [
   { id: 'landmark', label: '城市建筑', Icon: Landmark },
   { id: 'shield', label: '防护卫戍', Icon: Shield },
   { id: 'crown', label: '主权王冕', Icon: Crown },
   { id: 'compass', label: '航向罗盘', Icon: Compass },
-  { id: 'flag', label: '立国旗帜', Icon: Flag },
-  { id: 'globe', label: '地缘宏观', Icon: Globe2 },
-  { id: 'anchor', label: '深蓝海权', Icon: Anchor },
-  { id: 'flame', label: '燎原战火', Icon: Flame },
-  { id: 'zap', label: '雷霆迅捷', Icon: Zap },
-  { id: 'target', label: '战役枢纽', Icon: Target },
-  { id: 'feather', label: '执笔史册', Icon: Feather },
-  { id: 'castle', label: '要塞坚垒', Icon: Castle },
-];
-
-// 「更多徽标」分类扩展库（统一 Lucide 矢量线框风格）
-const MORE_TOTEM_GROUPS = [
-  {
-    groupName: '军略与统御',
-    icons: [
-      { id: 'swords', label: '兵戈交锋', Icon: Swords },
-      { id: 'shield-alert', label: '边境警戒', Icon: ShieldAlert },
-      { id: 'crosshair', label: '战略准星', Icon: Crosshair },
-      { id: 'navigation', label: '远征进击', Icon: Navigation },
-    ],
-  },
-  {
-    groupName: '权制与法典',
-    icons: [
-      { id: 'scale', label: '公平天平', Icon: Scale },
-      { id: 'scroll', label: '和约公报', Icon: Scroll },
-      { id: 'book', label: '编年史册', Icon: BookOpen },
-      { id: 'award', label: '至高勋荣', Icon: Award },
-    ],
-  },
-  {
-    groupName: '疆域与探索',
-    icons: [
-      { id: 'map', label: '大界舆图', Icon: Map },
-      { id: 'map-pin', label: '核心要冲', Icon: MapPin },
-      { id: 'ship', label: '海陆巡航', Icon: Ship },
-      { id: 'mountain', label: '天险关隘', Icon: Mountain },
-    ],
-  },
-  {
-    groupName: '营造与星火',
-    icons: [
-      { id: 'cog', label: '重工制造', Icon: Cog },
-      { id: 'radio', label: '前线通讯', Icon: Radio },
-      { id: 'sun', label: '日出破晓', Icon: Sun },
-      { id: 'sparkles', label: '文明之光', Icon: Sparkles },
-    ],
-  },
-];
-
-const TOTEM_OPTIONS = [
-  ...PRIMARY_TOTEMS,
-  ...MORE_TOTEM_GROUPS.flatMap((g) => g.icons),
+  { id: 'anchor', label: '深海舰队', Icon: Anchor },
+  { id: 'swords', label: '常备武备', Icon: Swords },
+  { id: 'target', label: '战略准星', Icon: Target },
+  { id: 'castle', label: '要塞核心', Icon: Castle },
+  { id: 'scale', label: '秩序法度', Icon: Scale },
+  { id: 'flag', label: '战线军旗', Icon: Flag },
+  { id: 'book', label: '文明典籍', Icon: BookOpen },
+  { id: 'feather', label: '外交国牒', Icon: Feather },
 ];
 
 const THEME_COLORS = [
@@ -146,68 +90,210 @@ export const WorkspaceCreationWizard: React.FC<WorkspaceCreationWizardProps> = (
   onOpenAuth,
   user,
 }) => {
-  // Step state: 1: 纪元与世界观 | 2: 地缘规则 | 3: 参演阵营与发布
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  // 两大核心阶段：1: 剧本设置 | 2: 国家建立页
+  const [currentStep, setCurrentStep] = useState<1 | 2>(1);
 
-  // Form states (无预设，创作者完全自主定义)
+  // 剧本设置内部子标签：'basic'（纪元与世界观）| 'rules'（推演机制与规则）
+  const [scenarioSubTab, setScenarioSubTab] = useState<'basic' | 'rules'>('basic');
+
+  // 剧本基础信息
   const [name, setName] = useState('');
   const [era, setEra] = useState('1936年');
   const [customEraInput, setCustomEraInput] = useState('');
   const [scenarioType, setScenarioType] = useState<'拟实' | '架空'>('拟实');
   const [totemIcon, setTotemIcon] = useState('landmark');
-  const [showMoreIcons, setShowMoreIcons] = useState(false);
   const [themeColor, setThemeColor] = useState('#6366f1');
   const [description, setDescription] = useState('');
 
-  // Step 2 states: Rules
+  // 剧本地缘规则与推演参数
   const [paceMode, setPaceMode] = useState<'turn' | 'realtime' | 'free'>('turn');
   const [warTaxCap, setWarTaxCap] = useState<number>(25);
   const [conversionRate, setConversionRate] = useState<string>('15%');
   const [nukeAllowed, setNukeAllowed] = useState<boolean>(false);
-  const [maxAllies, setMaxAllies] = useState<number>(3); // 默认最多3国
+  const [maxAllies, setMaxAllies] = useState<number>(3);
   const [arbitrationEnabled, setArbitrationEnabled] = useState<boolean>(true);
-
-  // Step 3 states: Access, Victory & Launch
   const [joinPolicy, setJoinPolicy] = useState<'open' | 'apply' | 'spectate'>('open');
   const [victoryCondition, setVictoryCondition] = useState<'domination' | 'treaty' | 'endless'>('domination');
   const [initialTension, setInitialTension] = useState<number>(25);
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');
   const [licenseType, setLicenseType] = useState('CC-BY-NC 自由派生');
+
+  // 国家建立页状态（第 2 阶段）
+  const [stagedNations, setStagedNations] = useState<Nation[]>([]);
+  const [nationName, setNationName] = useState('');
+  const [nationShortName, setNationShortName] = useState('');
+  const [selectedFlagRatio, setSelectedFlagRatio] = useState<FlagRatio>('3:2');
+  const [selectedPaletteIndex, setSelectedPaletteIndex] = useState<number>(0);
+  const [customColor, setCustomColor] = useState('');
+  const [uploadedFlagUrl, setUploadedFlagUrl] = useState<string | null>(null);
+  const [selectedRegimeIndex, setSelectedRegimeIndex] = useState<number>(0);
+  const [capitalCity, setCapitalCity] = useState('');
+  const [leaderName, setLeaderName] = useState('');
+  const [initialManpower, setInitialManpower] = useState<number>(100000);
+  const [civilianFactoriesCount, setCivilianFactoriesCount] = useState<number>(12);
+  const [militaryFactoriesCount, setMilitaryFactoriesCount] = useState<number>(8);
+  const [nationDesc, setNationDesc] = useState('');
+  const [nationSuccessMsg, setNationSuccessMsg] = useState<string | null>(null);
+
+  // 配额自救管理浮层
+  const [showQuotaManager, setShowQuotaManager] = useState(false);
+  const [quotaRefreshKey, setQuotaRefreshKey] = useState(0);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // 创作者配额检查（单个创作者最多3个剧本，超出需删除已有剧本）
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 创作者配额
   const quota = workspaceService.canCreateWorkspace(user?.id);
+  const creatorWorkspaces = workspaceService.getCreatorWorkspaces(user?.id);
 
   if (!isOpen) return null;
 
-  const handleNextStep = () => {
+  // 上传国旗处理
+  const processImageFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setErrorMsg('请上传有效的图片格式文件 (PNG, JPG, SVG, WebP)');
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setErrorMsg('国旗图片大小请控制在 4MB 以内');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result;
+      if (typeof result === 'string') {
+        setUploadedFlagUrl(result);
+        setErrorMsg(null);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processImageFile(file);
+    }
+  };
+
+  // 暂存一个国家实体
+  const handleStageCurrentNation = () => {
+    const trimmed = nationName.trim();
+    if (!trimmed) {
+      setErrorMsg('请先输入国家名称再暂存');
+      return;
+    }
+
+    const regimeOpt = REGIME_OPTIONS[selectedRegimeIndex];
+    const palette = PRESET_FLAG_PALETTES[selectedPaletteIndex];
+    const finalFlagColor = customColor || palette?.color || '#1D4ED8';
+    const effectiveEra = customEraInput.trim() || era;
+
+    const newNation: Nation = {
+      id: `nation_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      ownerId: user?.id || 'usr_commander',
+      ownerUsername: user?.username || user?.name || '领主创作者',
+      ownerDouyinName: user?.douyinName || '',
+      name: trimmed,
+      shortName: nationShortName.trim() || trimmed.slice(0, 2),
+      nationType: regimeOpt.label,
+      regime: regimeOpt.regime,
+      ideology: regimeOpt.ideology,
+      flagColor: finalFlagColor,
+      flagUrl: uploadedFlagUrl || undefined,
+      flagRatio: selectedFlagRatio,
+      capital: capitalCity.trim() || '未定都',
+      territory: '0 省份（待勘定划拨）',
+      description: nationDesc.trim() || `${trimmed} 是推演剧本【${name || '粉陆推演'}】(${effectiveEra}) 的参演主权实体。`,
+      language: '中文',
+      currency: '金币',
+      currencyRate: 1,
+      nameFont: 'sans',
+      emblemIcon: 'flag',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      provinces: [],
+      stabilityIndex: 85,
+      policyPoints: 100,
+      civilianFactories: civilianFactoriesCount,
+      militaryFactories: militaryFactoriesCount,
+      militaryIndustry: {
+        productionLines: [],
+        customDesigns: [],
+        stockpiles: {},
+      },
+      army: {
+        divisions: [],
+        manpowerReserve: initialManpower,
+        armyExperience: 20,
+        generals: [
+          {
+            id: 'gen_1',
+            name: leaderName.trim() || '最高统帅',
+            rank: '元帅',
+            attackBonus: 10,
+            defenseBonus: 10,
+          },
+        ],
+      },
+    };
+
+    setStagedNations((prev) => [...prev, newNation]);
+    setNationSuccessMsg(`参演国家【${trimmed}】已暂存！可继续构筑下一个或完成发布。`);
+    setErrorMsg(null);
+
+    // 清空表单准备创建下一个
+    setNationName('');
+    setNationShortName('');
+    setCapitalCity('');
+    setLeaderName('');
+    setNationDesc('');
+    setUploadedFlagUrl(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    // 轮换下一个配色
+    setSelectedPaletteIndex((prev) => (prev + 1) % PRESET_FLAG_PALETTES.length);
+  };
+
+  // 删除已暂存的国家
+  const handleRemoveStagedNation = (nationId: string) => {
+    setStagedNations((prev) => prev.filter((n) => n.id !== nationId));
+  };
+
+  // 删除已有自建剧本以释放名额
+  const handleDeleteExistingWorkspace = (wsId: string) => {
+    const res = workspaceService.deleteWorkspace(wsId);
+    if (res.success) {
+      setQuotaRefreshKey((k) => k + 1);
+      setErrorMsg(null);
+    } else {
+      setErrorMsg(res.message || '删除失败');
+    }
+  };
+
+  // 下一步：前往国家建立页
+  const handleProceedToNationCreation = () => {
     if (!isCreator) {
       setErrorMsg('仅已注册的创作者可构筑推演沙盘，请先注册/认证创作者账户');
       return;
     }
     if (!quota.allowed) {
-      setErrorMsg(`单个创作者最多创建 ${MAX_CREATOR_WORKSPACES} 个剧本。您当前已达上限（${quota.currentCount}/${MAX_CREATOR_WORKSPACES}），继续创建需要先删除已有的自建剧本。`);
+      setErrorMsg(`单个创作者最多创建 ${MAX_CREATOR_WORKSPACES} 个剧本。当前已达上限，请先在下方删除已有剧本以释放配额。`);
       return;
     }
-    if (currentStep === 1) {
-      if (!name.trim()) {
-        setErrorMsg('请填写剧本名称');
-        return;
-      }
-      setErrorMsg(null);
-      setCurrentStep(2);
-    } else if (currentStep === 2) {
-      setCurrentStep(3);
+    if (!name.trim()) {
+      setErrorMsg('请填写剧本名称');
+      setScenarioSubTab('basic');
+      return;
     }
+    setErrorMsg(null);
+    setCurrentStep(2);
   };
 
-  const handlePrevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep((prev) => (prev - 1) as 1 | 2 | 3);
-    }
-  };
-
+  // 提交完成构筑并启动推演
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isCreator) {
@@ -215,17 +301,109 @@ export const WorkspaceCreationWizard: React.FC<WorkspaceCreationWizardProps> = (
       return;
     }
     if (!quota.allowed) {
-      setErrorMsg(`单个创作者最多创建 ${MAX_CREATOR_WORKSPACES} 个剧本。您当前已达上限（${quota.currentCount}/${MAX_CREATOR_WORKSPACES}），继续创建需要先删除已有的自建剧本。`);
+      setErrorMsg(`单个创作者最多创建 ${MAX_CREATOR_WORKSPACES} 个剧本。当前已达上限，请先删除已有自建剧本。`);
       return;
     }
     if (!name.trim()) {
       setErrorMsg('剧本名称不能为空');
+      setCurrentStep(1);
+      setScenarioSubTab('basic');
       return;
     }
 
     setIsSubmitting(true);
     try {
       const effectiveEra = customEraInput.trim() || era;
+
+      // 组装最终国家列表
+      let finalNations = [...stagedNations];
+
+      // 如果当前表单中输入了国家名称但尚未点击“暂存”，自动将其作为国家加入
+      const currentInputName = nationName.trim();
+      if (currentInputName) {
+        const regimeOpt = REGIME_OPTIONS[selectedRegimeIndex];
+        const palette = PRESET_FLAG_PALETTES[selectedPaletteIndex];
+        const finalFlagColor = customColor || palette?.color || '#1D4ED8';
+
+        const autoNation: Nation = {
+          id: `nation_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          ownerId: user?.id || 'usr_commander',
+          ownerUsername: user?.username || user?.name || '领主创作者',
+          ownerDouyinName: user?.douyinName || '',
+          name: currentInputName,
+          shortName: nationShortName.trim() || currentInputName.slice(0, 2),
+          nationType: regimeOpt.label,
+          regime: regimeOpt.regime,
+          ideology: regimeOpt.ideology,
+          flagColor: finalFlagColor,
+          flagUrl: uploadedFlagUrl || undefined,
+          flagRatio: selectedFlagRatio,
+          capital: capitalCity.trim() || '未定都',
+          territory: '0 省份（待勘定划拨）',
+          description: nationDesc.trim() || `${currentInputName} 是推演剧本【${name.trim()}】的初始参演国家。`,
+          language: '中文',
+          currency: '金币',
+          currencyRate: 1,
+          nameFont: 'sans',
+          emblemIcon: 'flag',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          provinces: [],
+          stabilityIndex: 85,
+          policyPoints: 100,
+          civilianFactories: civilianFactoriesCount,
+          militaryFactories: militaryFactoriesCount,
+          militaryIndustry: {
+            productionLines: [],
+            customDesigns: [],
+            stockpiles: {},
+          },
+          army: {
+            divisions: [],
+            manpowerReserve: initialManpower,
+            armyExperience: 20,
+            generals: [
+              {
+                id: 'gen_1',
+                name: leaderName.trim() || '最高统帅',
+                rank: '元帅',
+                attackBonus: 10,
+                defenseBonus: 10,
+              },
+            ],
+          },
+        };
+        finalNations.push(autoNation);
+      }
+
+      // 若创作者完全未建国家，自动生成一个基于剧本名称的默认首个母国实体
+      if (finalNations.length === 0) {
+        const defaultName = `${name.trim()}国`;
+        finalNations.push({
+          id: `nation_${Date.now()}_default`,
+          ownerId: user?.id || 'usr_commander',
+          ownerUsername: user?.username || user?.name || '领主创作者',
+          ownerDouyinName: user?.douyinName || '',
+          name: defaultName,
+          shortName: defaultName.slice(0, 2),
+          nationType: '民主共和国',
+          regime: '民主议会制',
+          ideology: '自由民主主义',
+          flagColor: themeColor,
+          flagRatio: '3:2',
+          capital: '未定都',
+          territory: '0 省份（待勘定划拨）',
+          description: `推演剧本【${name.trim()}】的基石参演实体。`,
+          language: '中文',
+          currency: '金币',
+          currencyRate: 1,
+          nameFont: 'sans',
+          emblemIcon: 'landmark',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          provinces: [],
+        });
+      }
 
       const created = workspaceService.createWorkspace({
         name: name.trim(),
@@ -252,7 +430,8 @@ export const WorkspaceCreationWizard: React.FC<WorkspaceCreationWizardProps> = (
         joinPolicy,
         victoryCondition,
         initialTension,
-        coreFactions: [],
+        coreFactions: finalNations.map((n) => n.name),
+        customNations: finalNations,
         licenseType,
         creatorId: user?.id || 'usr_creator_' + Math.random().toString(36).substring(2, 8),
         creatorName: user?.username || user?.name || '特约创作者',
@@ -261,7 +440,7 @@ export const WorkspaceCreationWizard: React.FC<WorkspaceCreationWizardProps> = (
       onSuccess(created);
       onClose();
     } catch (err: any) {
-      setErrorMsg(err?.message || '创建推演工作区失败，请重试');
+      setErrorMsg(err?.message || '创建推演沙盘失败，请重试');
     } finally {
       setIsSubmitting(false);
     }
@@ -274,127 +453,65 @@ export const WorkspaceCreationWizard: React.FC<WorkspaceCreationWizardProps> = (
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.98, y: 6 }}
         transition={{ duration: 0.2 }}
-        className="w-full h-full sm:h-auto sm:max-h-[92vh] max-w-2xl bg-slate-50/80 border-0 sm:border sm:border-slate-200/90 sm:rounded-2xl shadow-xl overflow-hidden flex flex-col"
+        className="w-full h-full sm:h-auto sm:max-h-[92vh] max-w-3xl bg-white sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200/90 select-none"
       >
-        {/* Header with Step Indicator */}
-        <div className="relative border-b border-slate-200/80 bg-white px-4 py-3 sm:px-6 sm:py-3.5 flex items-center justify-between shrink-0">
+        {/* 顶部标题栏与步骤指示器：严格先剧本设置，再国家建立页 */}
+        <div className="border-b border-slate-200/80 bg-white px-4 py-3 sm:px-6 sm:py-3.5 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
             <div
               className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 border border-slate-200/60"
               style={{ backgroundColor: `${themeColor}12`, color: themeColor }}
             >
               {(() => {
-                const item = TOTEM_OPTIONS.find((t) => t.id === totemIcon) || TOTEM_OPTIONS[0];
+                const item = PRIMARY_TOTEMS.find((t) => t.id === totemIcon) || PRIMARY_TOTEMS[0];
                 const IconComp = item.Icon;
                 return <IconComp className="w-4 h-4 sm:w-5 sm:h-5 stroke-[1.75]" />;
               })()}
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <h2 className="text-xs sm:text-sm font-bold text-slate-900 truncate">
-                  分步构筑推演沙盘
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                  {currentStep === 1 ? '构筑推演沙盘 · 剧本配置' : '构筑推演沙盘 · 国家建立'}
                 </h2>
-                <span className="text-[10px] font-medium px-1.5 py-0.2 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/60">
                   创作者向导
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                Step {currentStep}/3：
-                {currentStep === 1 && '设定年代纪元与世界观'}
-                {currentStep === 2 && '编纂地缘规则与推演参数'}
-                {currentStep === 3 && '设定全球紧张度与沙盘发布'}
+                {currentStep === 1 ? '设定年代纪元、世界观背景公报与地缘推演规则' : '为本剧本构筑参演国家实体（政体、国旗与初始国力）'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Desktop Step Pills */}
-            <div className="hidden sm:flex items-center gap-1">
-              {[
-                { step: 1, label: '01 纪元世界观' },
-                { step: 2, label: '02 推演规则' },
-                { step: 3, label: '03 紧张度与发布' },
-              ].map((item) => (
-                <div
-                  key={item.step}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
-                    currentStep === item.step
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : currentStep > item.step
-                      ? 'bg-indigo-50 text-indigo-700 font-bold'
-                      : 'bg-slate-100 text-slate-400'
-                  }`}
-                >
-                  {currentStep > item.step ? (
-                    <Check className="w-3 h-3" />
-                  ) : (
-                    <span className="w-3.5 h-3.5 rounded-full bg-white/20 flex items-center justify-center text-[10px]">
-                      {item.step}
-                    </span>
-                  )}
-                  <span>{item.label}</span>
-                </div>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
-              aria-label="关闭向导"
-            >
-              <X className="w-4 h-4 sm:w-5 sm:h-5" />
-            </button>
-          </div>
-
-          {/* Ultra-slim progress bar (2px) showing overall wizard advancement */}
-          <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-slate-100 overflow-hidden">
-            <motion.div
-              className="h-full bg-indigo-600"
-              initial={false}
-              animate={{ width: `${(currentStep / 3) * 100}%` }}
-              transition={{ duration: 0.25, ease: 'easeInOut' }}
-            />
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition cursor-pointer shrink-0"
+            title="关闭"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Not creator gate */}
+        {/* 权限提示：若非创作者 */}
         {!isCreator ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4 bg-slate-50/50">
-            <div className="w-16 h-16 rounded-2xl bg-amber-100/90 text-amber-700 flex items-center justify-center shadow-xs">
-              <Shield className="w-8 h-8" />
+          <div className="p-8 text-center space-y-4 my-auto">
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto">
+              <Shield className="w-6 h-6" />
             </div>
-            <div className="max-w-md mx-auto space-y-2">
-              <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold">
-                创作者专属权限
-              </span>
-              <h3 className="text-base font-black text-slate-900">
-                分步构筑推演沙盘 · 仅已注册创作者可构筑
-              </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                创建全新独立推演沙盘涉及全局年代纪元、地缘规则法则、核武权限及主权阵营编组，仅面向平台认证创作者开放。
+            <div className="max-w-md mx-auto">
+              <h3 className="text-base font-bold text-slate-900">需创作者身份认证</h3>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                自建推演剧本和构筑参演国家属于创作者专属权限。请先注册或登录创作者账户后继续。
               </p>
-              <div className="p-3 rounded-xl bg-white border border-amber-200/80 text-left text-xs text-slate-700 space-y-1 mt-3">
-                <div className="font-bold text-amber-900 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                  <span>普通用户如何构筑沙盘？</span>
-                </div>
-                <div className="text-[11px] text-slate-500 leading-normal">
-                  您只需免费注册创作者账户（免人工审核），即可立即解锁分步构筑向导、发布独立推演世界观，并邀请其他领主入驻推演！
-                </div>
-              </div>
             </div>
-            <div className="flex flex-col sm:flex-row items-center gap-2 pt-2">
+            <div className="flex items-center justify-center gap-2 pt-2">
               <button
                 type="button"
-                onClick={() => {
-                  onOpenAuth('register');
-                  onClose();
-                }}
-                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition inline-flex items-center gap-2 cursor-pointer active:scale-95"
+                onClick={() => onOpenAuth('register')}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition cursor-pointer"
               >
-                <Sparkles className="w-4 h-4 text-amber-300" />
-                <span>立即注册/认证创作者账户（解锁向导）</span>
+                注册成为创作者
               </button>
               <button
                 type="button"
@@ -406,198 +523,202 @@ export const WorkspaceCreationWizard: React.FC<WorkspaceCreationWizardProps> = (
             </div>
           </div>
         ) : (
-          /* Content Body */
+          /* 主体内容滚动区 */
           <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 space-y-4">
-            {/* 创作者剧本名额配额指示条 */}
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-100/90 border border-slate-200/80 text-xs">
-              <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-indigo-600 shrink-0" />
-                <span className="text-slate-700 font-medium">自建剧本配额：</span>
-                <span className={`font-mono font-bold ${quota.currentCount >= MAX_CREATOR_WORKSPACES ? 'text-amber-600' : 'text-indigo-600'}`}>
-                  {quota.currentCount} / {MAX_CREATOR_WORKSPACES}
-                </span>
-                <span className="text-[11px] text-slate-400">（单人最多 3 个）</span>
+            {/* 配额状态指示条与快捷释放 */}
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/90 text-xs space-y-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span className="text-slate-700 font-medium">自建剧本配额：</span>
+                  <span
+                    className={`font-mono font-bold ${
+                      quota.currentCount >= MAX_CREATOR_WORKSPACES ? 'text-amber-600' : 'text-indigo-600'
+                    }`}
+                  >
+                    {quota.currentCount} / {MAX_CREATOR_WORKSPACES}
+                  </span>
+                  <span className="text-[11px] text-slate-400">（单人最多 3 个）</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {!quota.allowed ? (
+                    <span className="text-[11px] text-rose-600 font-medium bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200/60">
+                      配额已满，需删除已有剧本
+                    </span>
+                  ) : null}
+
+                  {creatorWorkspaces.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowQuotaManager(!showQuotaManager)}
+                      className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                    >
+                      {showQuotaManager ? '收起管理' : '管理/删除已有自建剧本'}
+                    </button>
+                  )}
+                </div>
               </div>
-              {!quota.allowed && (
-                <span className="text-[11px] text-rose-600 font-medium bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200/60">
-                  配额已满，继续创建需删除已有剧本
-                </span>
+
+              {/* 展开的已有剧本清理面板 */}
+              {showQuotaManager && (
+                <div className="mt-2 pt-2 border-t border-slate-200 space-y-1.5">
+                  <p className="text-[11px] text-slate-500">点击垃圾桶可删除测试剧本以释放名额：</p>
+                  <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
+                    {creatorWorkspaces.map((w) => (
+                      <div
+                        key={w.id}
+                        className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200/80 text-xs"
+                      >
+                        <div className="min-w-0 flex-1 pr-2">
+                          <span className="font-bold text-slate-800 truncate block">{w.name}</span>
+                          <span className="text-[10px] text-slate-400">{w.era} · {w.customNations?.length || 0}国</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteExistingWorkspace(w.id)}
+                          className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                          title="删除该剧本释放名额"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
 
-          {errorMsg && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
-          {/* STEP 1: 纪元与世界观 (自主定义，无预设) */}
-          {currentStep === 1 && (
-            <div className="space-y-4">
-              {/* Title & Type */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    剧本名称 <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="如：欧亚大战略推演 / 新大陆自设风云"
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-indigo-600 transition"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    剧本性质
-                  </label>
-                  <div className="grid grid-cols-2 gap-1.5 h-9">
-                    <button
-                      type="button"
-                      onClick={() => setScenarioType('拟实')}
-                      className={`rounded-xl text-xs font-bold border transition cursor-pointer ${
-                        scenarioType === '拟实'
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      拟实历史
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setScenarioType('架空')}
-                      className={`rounded-xl text-xs font-bold border transition cursor-pointer ${
-                        scenarioType === '架空'
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      架空自设
-                    </button>
-                  </div>
-                </div>
+            {/* 错误提示 */}
+            {errorMsg && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2 animate-fadeIn">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{errorMsg}</span>
               </div>
+            )}
 
-              {/* Era Selection */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  剧本纪元年代
-                </label>
-                <div className="flex flex-wrap gap-1.5 items-center">
-                  {PRESET_ERAS.map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => {
-                        setEra(item);
-                        setCustomEraInput('');
-                      }}
-                      className={`py-1 px-2.5 text-xs font-bold rounded-lg border transition cursor-pointer ${
-                        era === item && !customEraInput
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                  <div className="flex-1 min-w-[140px]">
-                    <input
-                      type="text"
-                      placeholder="或自定义输入年份（如：1914年）"
-                      value={customEraInput}
-                      onChange={(e) => {
-                        setCustomEraInput(e.target.value);
-                        if (e.target.value) setEra(e.target.value);
-                      }}
-                      className="w-full h-7 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:border-indigo-600"
-                    />
-                  </div>
-                </div>
+            {/* 提示消息 */}
+            {nationSuccessMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-xs flex items-center gap-2 animate-fadeIn">
+                <Check className="w-4 h-4 shrink-0" />
+                <span>{nationSuccessMsg}</span>
               </div>
+            )}
 
-              {/* Worldview description */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  剧本世界观背景公报导言
-                </label>
-                <textarea
-                  rows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="详细描述本推演沙盘的时代背景、阵营冲突根源、以及给参演领主的宏观战略指引..."
-                  className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-indigo-600 transition resize-none leading-relaxed"
-                />
-              </div>
-
-              {/* 重构徽标选择器：纯白卡片底、无独立外框、克制浅紫选中态、12个常用徽标、展开更多分类 */}
-              <div className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-2xs">
-                <div className="mb-4">
-                  <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
-                    选择徽标
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-1">
-                    选择一个代表你的沙盘
-                  </p>
-                </div>
-
-                {/* 常用徽标阵列：未选中无边框无底色，仅选中显示浅紫微圆角底框 */}
-                <div className="grid grid-cols-7 gap-y-4 gap-x-1 sm:gap-x-3 place-items-center py-2">
-                  {PRIMARY_TOTEMS.map((item) => {
-                    const IconComp = item.Icon;
-                    const isSelected = totemIcon === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setTotemIcon(item.id)}
-                        className={`w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center transition-colors cursor-pointer ${
-                          isSelected
-                            ? 'bg-[#f5f3ff] border border-[#d8b4fe]/70 text-[#6B50F0] rounded-2xl shadow-2xs'
-                            : 'text-slate-700 hover:text-slate-950 rounded-2xl'
-                        }`}
-                        title={item.label}
-                      >
-                        <IconComp className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={1.75} />
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* 极细浅灰分割线 */}
-                <div className="h-px bg-slate-100 my-4" />
-
-                {/* 「更多徽标」触发展开 */}
-                <div className="flex items-center justify-between">
+            {/* ======================================================== */}
+            {/* 🌟 阶段一：【剧本设置】 */}
+            {/* ======================================================== */}
+            {currentStep === 1 && (
+              <div className="space-y-4 animate-fadeIn">
+                {/* 剧本设置内部子页签 */}
+                <div className="flex border-b border-slate-200 gap-4">
                   <button
                     type="button"
-                    onClick={() => setShowMoreIcons(!showMoreIcons)}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#6B50F0] hover:text-[#5841d8] transition cursor-pointer"
+                    onClick={() => setScenarioSubTab('basic')}
+                    className={`pb-2.5 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border-b-2 ${
+                      scenarioSubTab === 'basic'
+                        ? 'border-indigo-600 text-indigo-600'
+                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                    }`}
                   >
-                    <LayoutGrid className="w-4 h-4 text-[#6B50F0]" />
-                    <span>{showMoreIcons ? '收起更多徽标' : '更多徽标'}</span>
-                    <ChevronRight
-                      className={`w-3.5 h-3.5 text-[#6B50F0] transition-transform duration-200 ${
-                        showMoreIcons ? 'rotate-90' : ''
-                      }`}
-                    />
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>年代纪元与世界观</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScenarioSubTab('rules')}
+                    className={`pb-2.5 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border-b-2 ${
+                      scenarioSubTab === 'rules'
+                        ? 'border-indigo-600 text-indigo-600'
+                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                    <span>地缘规则与推演机制</span>
                   </button>
                 </div>
 
-                {/* 展开的更多徽标分组 */}
-                {showMoreIcons && (
-                  <div className="mt-4 pt-3 border-t border-slate-100 space-y-4 animate-in fade-in duration-200">
-                    {MORE_TOTEM_GROUPS.map((group) => (
-                      <div key={group.groupName}>
-                        <div className="text-[11px] font-semibold text-slate-400 mb-2">
-                          {group.groupName}
+                {/* 子页 1: 纪元与世界观 */}
+                {scenarioSubTab === 'basic' && (
+                  <div className="space-y-4">
+                    {/* 剧本名称与性质 */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          剧本名称 <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          placeholder="如：欧亚大战推演 / 新大陆自设风云"
+                          maxLength={30}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-indigo-500 transition"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">剧本性质</label>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {(['拟实', '架空'] as const).map((type) => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => setScenarioType(type)}
+                              className={`py-2 px-2 text-xs font-semibold rounded-xl border transition cursor-pointer text-center ${
+                                scenarioType === type
+                                  ? 'bg-indigo-50 border-indigo-300 text-indigo-700 font-bold'
+                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                              }`}
+                            >
+                              {type === '拟实' ? '拟实历史' : '架空自设'}
+                            </button>
+                          ))}
                         </div>
-                        <div className="grid grid-cols-4 sm:grid-cols-7 gap-y-3 gap-x-1 sm:gap-x-3 place-items-center">
-                          {group.icons.map((item) => {
+                      </div>
+                    </div>
+
+                    {/* 现代化的推演时间与纪元设置组件 */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs font-bold text-slate-700">
+                          剧本启幕时间与纪元标定 <span className="text-rose-500">*</span>
+                        </label>
+                      </div>
+                      <ScenarioTimeMatrixPicker
+                        value={customEraInput.trim() || era}
+                        onChange={(newEra) => {
+                          setEra(newEra);
+                          setCustomEraInput('');
+                        }}
+                        onContextSelect={(contextSummary) => {
+                          if (!description.trim()) {
+                            setDescription(contextSummary);
+                          }
+                        }}
+                      />
+                    </div>
+
+                    {/* 剧本世界观背景公报导言 */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        剧本世界观背景公报导言
+                      </label>
+                      <textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="详细描述本推演沙盘的时代背景、阵营冲突根源、以及给参演领主的宏观战略指引..."
+                        rows={3}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-indigo-500 transition resize-none"
+                      />
+                    </div>
+
+                    {/* 选择徽标与沙盘主题色调 */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">选择徽标</label>
+                        <div className="grid grid-cols-6 gap-1.5">
+                          {PRIMARY_TOTEMS.map((item) => {
                             const IconComp = item.Icon;
                             const isSelected = totemIcon === item.id;
                             return (
@@ -605,412 +726,530 @@ export const WorkspaceCreationWizard: React.FC<WorkspaceCreationWizardProps> = (
                                 key={item.id}
                                 type="button"
                                 onClick={() => setTotemIcon(item.id)}
-                                className={`w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center transition-colors cursor-pointer ${
+                                className={`p-2 rounded-xl border flex items-center justify-center transition cursor-pointer ${
                                   isSelected
-                                    ? 'bg-[#f5f3ff] border border-[#d8b4fe]/70 text-[#6B50F0] rounded-2xl shadow-2xs'
-                                    : 'text-slate-700 hover:text-slate-950 rounded-2xl'
+                                    ? 'bg-indigo-50 border-indigo-500 text-indigo-600 shadow-2xs'
+                                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
                                 }`}
                                 title={item.label}
                               >
-                                <IconComp className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={1.75} />
+                                <IconComp className="w-4 h-4" />
                               </button>
                             );
                           })}
                         </div>
                       </div>
-                    ))}
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">沙盘主题色调</label>
+                        <div className="flex flex-wrap gap-2">
+                          {THEME_COLORS.map((c) => (
+                            <button
+                              key={c.hex}
+                              type="button"
+                              onClick={() => setThemeColor(c.hex)}
+                              className={`w-7 h-7 rounded-full border transition cursor-pointer flex items-center justify-center ${
+                                themeColor === c.hex
+                                  ? 'border-slate-800 scale-110 shadow-xs ring-2 ring-indigo-200'
+                                  : 'border-slate-200 hover:scale-105'
+                              }`}
+                              style={{ backgroundColor: c.hex }}
+                              title={c.name}
+                            >
+                              {themeColor === c.hex && <Check className="w-3.5 h-3.5 text-white" />}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 子页 2: 推演规则与地缘机制 */}
+                {scenarioSubTab === 'rules' && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* 推进节奏 */}
+                      <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1.5">
+                        <label className="block text-xs font-bold text-slate-800">推进节奏模式</label>
+                        <div className="grid grid-cols-3 gap-1">
+                          {[
+                            { id: 'turn', label: '标准回合制' },
+                            { id: 'realtime', label: '实时推演' },
+                            { id: 'free', label: '自由沙盒' },
+                          ].map((m) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => setPaceMode(m.id as any)}
+                              className={`py-1.5 text-xs font-semibold rounded-lg border transition cursor-pointer text-center ${
+                                paceMode === m.id
+                                  ? 'bg-indigo-600 border-indigo-600 text-white shadow-2xs'
+                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              {m.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 最高战备税率 */}
+                      <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1.5">
+                        <div className="flex justify-between items-center text-xs font-bold text-slate-800">
+                          <span>最高战备税率上限</span>
+                          <span className="font-mono text-indigo-600">{warTaxCap}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={10}
+                          max={50}
+                          step={5}
+                          value={warTaxCap}
+                          onChange={(e) => setWarTaxCap(Number(e.target.value))}
+                          className="w-full accent-indigo-600 cursor-pointer"
+                        />
+                        <div className="flex justify-between text-[10px] text-slate-400">
+                          <span>10% (轻徭)</span>
+                          <span>30% (战时)</span>
+                          <span>50% (总动员)</span>
+                        </div>
+                      </div>
+
+                      {/* 转换速率 */}
+                      <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1.5">
+                        <label className="block text-xs font-bold text-slate-800">民工转军工转换速率</label>
+                        <div className="grid grid-cols-4 gap-1">
+                          {['10%', '15%', '25%', '40%'].map((rate) => (
+                            <button
+                              key={rate}
+                              type="button"
+                              onClick={() => setConversionRate(rate)}
+                              className={`py-1.5 text-xs font-mono font-bold rounded-lg border transition cursor-pointer text-center ${
+                                conversionRate === rate
+                                  ? 'bg-indigo-600 border-indigo-600 text-white shadow-2xs'
+                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              {rate}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 同盟成员上限 */}
+                      <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1.5">
+                        <label className="block text-xs font-bold text-slate-800">同盟成员国上限</label>
+                        <div className="grid grid-cols-4 gap-1">
+                          {[
+                            { num: 0, label: '无上限' },
+                            { num: 2, label: '双边(2国)' },
+                            { num: 3, label: '三方(3国)' },
+                            { num: 5, label: '多边(5国)' },
+                          ].map((opt) => (
+                            <button
+                              key={opt.num}
+                              type="button"
+                              onClick={() => setMaxAllies(opt.num)}
+                              className={`py-1.5 text-xs font-semibold rounded-lg border transition cursor-pointer text-center ${
+                                maxAllies === opt.num
+                                  ? 'bg-indigo-600 border-indigo-600 text-white shadow-2xs'
+                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 开关选项：核威慑与国际仲裁 */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <label className="p-3 rounded-xl border border-slate-200 bg-white flex items-center justify-between cursor-pointer hover:bg-slate-50 transition">
+                        <div>
+                          <div className="text-xs font-bold text-slate-800">允许核威慑与终极战略武器</div>
+                          <div className="text-[11px] text-slate-400">开启后各大阵营可研发战略打击能力</div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={nukeAllowed}
+                          onChange={(e) => setNukeAllowed(e.target.checked)}
+                          className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
+                        />
+                      </label>
+
+                      <label className="p-3 rounded-xl border border-slate-200 bg-white flex items-center justify-between cursor-pointer hover:bg-slate-50 transition">
+                        <div>
+                          <div className="text-xs font-bold text-slate-800">启用边境争端国际仲裁机制</div>
+                          <div className="text-[11px] text-slate-400">领土争议优先进入外交公投或条约仲裁</div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={arbitrationEnabled}
+                          onChange={(e) => setArbitrationEnabled(e.target.checked)}
+                          className="w-4 h-4 accent-indigo-600 rounded cursor-pointer"
+                        />
+                      </label>
+                    </div>
+
+                    {/* 全球紧张度与可见度 */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1.5">
+                        <div className="flex justify-between items-center text-xs font-bold text-slate-800">
+                          <span className="flex items-center gap-1">
+                            <Flame className="w-3.5 h-3.5 text-rose-500" />
+                            <span>初始全球紧张度</span>
+                          </span>
+                          <span className="font-mono text-rose-600">{initialTension}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={initialTension}
+                          onChange={(e) => setInitialTension(Number(e.target.value))}
+                          className="w-full accent-rose-600 cursor-pointer"
+                        />
+                      </div>
+
+                      <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1.5">
+                        <label className="block text-xs font-bold text-slate-800">沙盘公开可见度</label>
+                        <div className="grid grid-cols-2 gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setVisibility('public')}
+                            className={`py-1.5 text-xs font-semibold rounded-lg border transition cursor-pointer text-center ${
+                              visibility === 'public'
+                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-2xs'
+                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            公开（入库万国大厅）
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setVisibility('private')}
+                            className={`py-1.5 text-xs font-semibold rounded-lg border transition cursor-pointer text-center ${
+                              visibility === 'private'
+                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-2xs'
+                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            私密（仅创作者可见）
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
+            )}
 
-              {/* 底部自然提示语 */}
-              <div className="text-center text-xs text-slate-400 flex items-center justify-center gap-1.5 font-normal">
-                <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span>徽标可在创建沙盘后随时修改</span>
-              </div>
-
-              {/* 沙盘主题色调设置卡片 */}
-              <div className="p-4 bg-white rounded-2xl border border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
-                <div>
-                  <label className="block text-xs font-bold text-slate-800">
-                    沙盘主题色调
-                  </label>
-                  <span className="text-[11px] text-slate-400">
-                    用于主权疆域与推演标识色彩
-                  </span>
-                </div>
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  {THEME_COLORS.map((c) => (
-                    <button
-                      key={c.hex}
-                      type="button"
-                      onClick={() => setThemeColor(c.hex)}
-                      className={`w-7 h-7 rounded-full transition-all flex items-center justify-center border cursor-pointer ${
-                        themeColor === c.hex
-                          ? 'ring-2 ring-offset-2 ring-indigo-500 border-white scale-110'
-                          : 'border-black/10 hover:scale-105'
-                      }`}
-                      style={{ backgroundColor: c.hex }}
-                      title={c.name}
-                    >
-                      {themeColor === c.hex && <Check className="w-3.5 h-3.5 text-white stroke-[2.5]" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 2: 地缘规则与推演机制 */}
-          {currentStep === 2 && (
-            <div className="space-y-4">
-              {/* Economic & Industrial Rules */}
-              <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/80 space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-800">
-                    最高战备税率上限：<span className="text-indigo-600 font-mono">{warTaxCap}%</span>
-                  </label>
-                  <span className="text-[10px] text-slate-400">
-                    影响领主战时动员与后勤产能
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="10"
-                  max="50"
-                  step="5"
-                  value={warTaxCap}
-                  onChange={(e) => setWarTaxCap(Number(e.target.value))}
-                  className="w-full accent-indigo-600 cursor-pointer"
-                />
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            {/* ======================================================== */}
+            {/* 🌟 阶段二：【国家建立页】 */}
+            {/* ======================================================== */}
+            {currentStep === 2 && (
+              <div className="space-y-4 animate-fadeIn">
+                {/* 顶部指引 */}
+                <div className="p-3 rounded-xl bg-indigo-50/70 border border-indigo-100 flex items-start justify-between gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      民工转军工转换速率
-                    </label>
-                    <div className="grid grid-cols-3 gap-1">
-                      {['15%', '30%', '50%'].map((rate) => (
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-950">
+                      <Flag className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>为剧本【{name || '推演沙盘'}】建立参演国家实体</span>
+                    </div>
+                    <p className="text-[11px] text-indigo-700 mt-0.5 leading-relaxed">
+                      您可在此建立首个母国或连续构筑多个参演大国势力。发布后即可直接进入地图划拔省份疆域。
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-100/80 text-indigo-800 shrink-0 font-bold">
+                    已建立 {stagedNations.length} 国
+                  </span>
+                </div>
+
+                {/* 已暂存国家横向列表（若有） */}
+                {stagedNations.length > 0 && (
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-bold text-slate-700">已构筑的参演国家：</span>
+                    <div className="flex flex-wrap gap-2">
+                      {stagedNations.map((n) => (
+                        <div
+                          key={n.id}
+                          className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs"
+                        >
+                          <div
+                            style={{ aspectRatio: getAspectRatioCSS(n.flagRatio) }}
+                            className="h-4.5 rounded-sm overflow-hidden border border-slate-200"
+                          >
+                            <NationFlagDisplay
+                              flagUrl={n.flagUrl}
+                              flagColor={n.flagColor}
+                              name={n.name}
+                              ratio={n.flagRatio}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <span className="text-xs font-bold text-slate-800">{n.name}</span>
+                          <span className="text-[10px] text-slate-400">({n.regime})</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveStagedNation(n.id)}
+                            className="text-slate-400 hover:text-rose-600 p-0.5 cursor-pointer ml-1"
+                            title="删除该国家"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 国家建立表单 */}
+                <div className="p-4 bg-slate-50/80 border border-slate-200 rounded-2xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>构筑参演国家实体</span>
+                    </h4>
+                  </div>
+
+                  {/* 国家名称与简称 */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        国家全称 <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={nationName}
+                        onChange={(e) => setNationName(e.target.value)}
+                        placeholder="如：索拉利亚第一共和国 / 东方联合帝国"
+                        maxLength={24}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-indigo-500 transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">国家简称</label>
+                      <input
+                        type="text"
+                        value={nationShortName}
+                        onChange={(e) => setNationShortName(e.target.value)}
+                        placeholder="如：索 / SOL"
+                        maxLength={6}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-indigo-500 transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 国旗比例与国旗外观 */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-slate-700">国旗比例标准</label>
+                      <span className="text-[10px] text-slate-400">标准推演旗帜长宽比</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {FLAG_RATIO_OPTIONS.map((item) => (
                         <button
-                          key={rate}
+                          key={item.id}
                           type="button"
-                          onClick={() => setConversionRate(rate)}
-                          className={`py-1 text-xs font-bold rounded-lg border transition ${
-                            conversionRate === rate
-                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                          onClick={() => setSelectedFlagRatio(item.id)}
+                          className={`p-2 rounded-xl border text-left transition cursor-pointer ${
+                            selectedFlagRatio === item.id
+                              ? 'bg-indigo-50 border-indigo-400 text-indigo-900 shadow-2xs font-bold'
+                              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                           }`}
                         >
-                          {rate}
+                          <div className="text-xs font-mono font-bold">{item.label}</div>
+                          <div className="text-[10px] text-slate-400 truncate">{item.desc}</div>
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-bold text-slate-700">
-                        同盟成员上限
-                      </label>
-                      <span className="text-[10px] text-slate-400">
-                        最多 {maxAllies} 个国家加入同一同盟
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between h-[30px] px-2.5 bg-slate-50 border border-slate-200 rounded-lg">
-                      <span className="text-xs font-bold text-slate-800 flex items-baseline gap-0.5">
-                        <span className="font-mono text-sm text-indigo-600">{maxAllies}</span>
-                        <span className="text-[11px] text-slate-500 font-normal">国</span>
-                      </span>
-
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setMaxAllies((prev) => Math.max(1, prev - 1))}
-                          disabled={maxAllies <= 1}
-                          className="w-5 h-5 rounded bg-white hover:bg-slate-100 border border-slate-200 disabled:opacity-30 disabled:cursor-not-allowed text-slate-600 font-bold flex items-center justify-center transition cursor-pointer shadow-2xs"
-                          aria-label="减少同盟成员上限"
-                        >
-                          <Minus className="w-2.5 h-2.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setMaxAllies((prev) => Math.min(10, prev + 1))}
-                          disabled={maxAllies >= 10}
-                          className="w-5 h-5 rounded bg-white hover:bg-slate-100 border border-slate-200 disabled:opacity-30 disabled:cursor-not-allowed text-slate-600 font-bold flex items-center justify-center transition cursor-pointer shadow-2xs"
-                          aria-label="增加同盟成员上限"
-                        >
-                          <Plus className="w-2.5 h-2.5" />
-                        </button>
+                  {/* 国旗代表色与上传 */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="sm:col-span-2 space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-700">国旗代表色调</label>
+                      <div className="flex flex-wrap gap-2">
+                        {PRESET_FLAG_PALETTES.map((palette, idx) => {
+                          const isSelected = selectedPaletteIndex === idx && !customColor;
+                          return (
+                            <button
+                              key={palette.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedPaletteIndex(idx);
+                                setCustomColor('');
+                              }}
+                              className={`w-6.5 h-6.5 rounded-full border transition cursor-pointer flex items-center justify-center ${
+                                isSelected
+                                  ? 'border-slate-800 scale-110 shadow-xs ring-2 ring-indigo-200'
+                                  : 'border-slate-200 hover:scale-105'
+                              }`}
+                              style={{ backgroundColor: palette.color }}
+                              title={palette.name}
+                            >
+                              {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* Toggles */}
-                <div className="pt-2 border-t border-slate-200 flex flex-wrap gap-4 text-xs">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={nukeAllowed}
-                      onChange={(e) => setNukeAllowed(e.target.checked)}
-                      className="rounded text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <span className="text-slate-700 font-bold">允许核威慑 / 战略核研发</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={arbitrationEnabled}
-                      onChange={(e) => setArbitrationEnabled(e.target.checked)}
-                      className="rounded text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <span className="text-slate-700 font-bold">启用边境争端国际仲裁机制</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Scenario Overview Description */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  剧本世界观背景公报导言
-                </label>
-                <textarea
-                  rows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="详细描述本推演沙盘的时代背景、阵营冲突根源、以及给参演领主的宏观战略指引..."
-                  className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-indigo-600 transition resize-none leading-relaxed"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* STEP 3: 全球紧张度与沙盘发布 */}
-          {currentStep === 3 && (
-            <div className="space-y-4">
-              {/* 1. 全球紧张度 */}
-              <div className="p-3.5 sm:p-4 rounded-xl border border-slate-200/90 bg-white shadow-2xs space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <Activity className="w-3.5 h-3.5 text-indigo-600" />
-                    <span className="text-xs font-bold text-slate-900">全球紧张度</span>
+                    {/* 上传自定义国旗 */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">上传国旗图片</label>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full py-2 px-3 rounded-xl border border-dashed border-slate-300 bg-white hover:bg-slate-50 text-slate-600 text-xs font-medium flex items-center justify-center gap-1.5 transition cursor-pointer"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>{uploadedFlagUrl ? '更换国旗图片' : '上传本地国旗'}</span>
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Numeric & Phase Badge */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-base font-bold font-mono text-indigo-600 tracking-tight">
-                      {initialTension}%
-                    </span>
-                    <span
-                      className={`text-[11px] font-medium px-2 py-0.5 rounded-md border ${
-                        initialTension <= 35
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
-                          : initialTension <= 70
-                          ? 'bg-amber-50 text-amber-700 border-amber-200/80'
-                          : 'bg-rose-50 text-rose-700 border-rose-200/80'
-                      }`}
+                  {/* 实时国旗预览 */}
+                  <div className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div
+                        style={{ aspectRatio: getAspectRatioCSS(selectedFlagRatio) }}
+                        className="h-10 rounded-md overflow-hidden bg-slate-100 border border-slate-300 shadow-2xs flex items-center justify-center"
+                      >
+                        <NationFlagDisplay
+                          flagUrl={uploadedFlagUrl || undefined}
+                          flagColor={customColor || PRESET_FLAG_PALETTES[selectedPaletteIndex]?.color}
+                          name={nationName || '新国家'}
+                          ratio={selectedFlagRatio}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-800">
+                          {nationName.trim() || '国家名称预览'}
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          {FLAG_RATIO_OPTIONS.find((r) => r.id === selectedFlagRatio)?.label} 比例 ·{' '}
+                          {uploadedFlagUrl ? '自定义国旗' : PRESET_FLAG_PALETTES[selectedPaletteIndex]?.name}
+                        </div>
+                      </div>
+                    </div>
+
+                    {uploadedFlagUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setUploadedFlagUrl(null)}
+                        className="text-[10px] text-rose-500 hover:text-rose-700 cursor-pointer"
+                      >
+                        清除图片使用色块
+                      </button>
+                    )}
+                  </div>
+
+                  {/* 政体制度与意识形态 */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700">政体制度与意识形态</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {REGIME_OPTIONS.map((item, idx) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onClick={() => setSelectedRegimeIndex(idx)}
+                          className={`p-2 rounded-xl border text-left transition cursor-pointer ${
+                            selectedRegimeIndex === idx
+                              ? 'bg-indigo-50 border-indigo-400 text-indigo-900 shadow-2xs font-bold'
+                              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="text-xs font-bold">{item.label}</div>
+                          <div className="text-[10px] text-slate-400 truncate">{item.desc}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 法定都城与统治者 */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">法定都城名称</label>
+                      <input
+                        type="text"
+                        value={capitalCity}
+                        onChange={(e) => setCapitalCity(e.target.value)}
+                        placeholder="如：君士坦丁 / 洛林堡 / 待勘定"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-indigo-500 transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">最高领袖称谓</label>
+                      <input
+                        type="text"
+                        value={leaderName}
+                        onChange={(e) => setLeaderName(e.target.value)}
+                        placeholder="如：大总督 / 护国元帅 / 执政官"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-indigo-500 transition"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 快捷暂存按钮 */}
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="button"
+                      onClick={handleStageCurrentNation}
+                      className="px-4 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
                     >
-                      {initialTension <= 35
-                        ? '和平积蓄期 · 内政工农优先'
-                        : initialTension <= 70
-                        ? '地缘对峙期 · 军备摩擦升级'
-                        : '大战前夕 · 全面战备总动员'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Slider with styled progress track */}
-                <div className="pt-1 pb-0.5">
-                  <div className="relative flex items-center">
-                    <input
-                      type="range"
-                      min={5}
-                      max={95}
-                      step={5}
-                      value={initialTension}
-                      onChange={(e) => setInitialTension(Number(e.target.value))}
-                      className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600 focus:outline-none"
-                      style={{
-                        background: `linear-gradient(to right, #4f46e5 0%, #4f46e5 ${initialTension}%, #e2e8f0 ${initialTension}%, #e2e8f0 100%)`
-                      }}
-                    />
-                  </div>
-
-                  {/* Lightweight stage benchmark ticks */}
-                  <div className="flex items-center justify-between text-[10px] text-slate-400 mt-2 select-none px-0.5">
-                    <span className={initialTension <= 35 ? 'text-emerald-700 font-semibold' : ''}>
-                      0% 和平积蓄
-                    </span>
-                    <span className={initialTension > 35 && initialTension <= 70 ? 'text-amber-700 font-semibold' : ''}>
-                      50% 地缘对峙
-                    </span>
-                    <span className={initialTension > 70 ? 'text-rose-700 font-semibold' : ''}>
-                      100% 战备动员
-                    </span>
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>暂存并继续构筑下一个国家</span>
+                    </button>
                   </div>
                 </div>
               </div>
-
-              {/* 2. 沙盘可见度 (Segmented Control) */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    <Eye className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>沙盘可见度</span>
-                  </label>
-                  <span className="text-[10px] text-slate-400">
-                    {visibility === 'public' ? '全域领主可见并可申请入驻' : '仅创建者本人在控制台可见'}
-                  </span>
-                </div>
-
-                <div className="bg-slate-100 p-1 rounded-xl border border-slate-200/60 grid grid-cols-2 gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setVisibility('public')}
-                    className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                      visibility === 'public'
-                        ? 'bg-white text-slate-900 shadow-2xs border border-slate-200/80'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    <Globe2 className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>公开推演沙盘</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setVisibility('private')}
-                    className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                      visibility === 'private'
-                        ? 'bg-white text-slate-900 shadow-2xs border border-slate-200/80'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    <Lock className="w-3.5 h-3.5 text-slate-600" />
-                    <span>创作者私有草稿</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 3. 创作者派生与知识产权许可 */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    <Scale className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>创作者派生与知识产权许可</span>
-                  </label>
-                  <span className="text-[10px] text-slate-400">法律公约</span>
-                </div>
-
-                <div className="relative">
-                  <select
-                    value={licenseType}
-                    onChange={(e) => setLicenseType(e.target.value)}
-                    className="w-full h-10 px-3.5 pr-9 text-xs bg-white border border-slate-200/90 rounded-xl text-slate-900 font-medium appearance-none focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-500/20 transition cursor-pointer shadow-2xs"
-                  >
-                    <option value="CC-BY-NC 自由派生">CC-BY-NC 自由派生与非商用创作（保留署名权）</option>
-                    <option value="独家创作 保留权利">独家原创剧本（保留所有衍生修改权利）</option>
-                    <option value="开源无限制派生">开源公开剧本（允许全社区自由派生演进）</option>
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                    <ChevronDown className="w-4 h-4" />
-                  </div>
-                </div>
-                <p className="text-[10px] text-slate-400 px-0.5 leading-normal">
-                  发布后沙盘即受此开源/创作公约约束，参演领主派生推演将自动继承署名条款。
-                </p>
-              </div>
-
-              {/* 4. LIVE PREVIEW CARD (Publication Summary) */}
-              <div className="p-3.5 sm:p-4 rounded-xl border border-slate-200/80 bg-white space-y-2.5 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">
-                    沙盘发布摘要 (Publication Summary)
-                  </span>
-                  <span
-                    className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                    style={{ backgroundColor: `${themeColor}15`, color: themeColor }}
-                  >
-                    {scenarioType} · {era}
-                  </span>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center shadow-2xs shrink-0 border border-slate-200/60"
-                    style={{ backgroundColor: `${themeColor}12` }}
-                  >
-                    {(() => {
-                      const totem = TOTEM_OPTIONS.find((t) => t.id === totemIcon) || TOTEM_OPTIONS[0];
-                      const IconComp = totem.Icon;
-                      return <IconComp className="w-5 h-5" style={{ color: themeColor }} />;
-                    })()}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate">{name}</h4>
-                    <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5 leading-relaxed">
-                      {description || '暂无沙盘描述设定'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-500">
-                  <div className="flex items-center gap-1">
-                    <Crown className="w-3 h-3 text-amber-500" />
-                    <span>架构师：{user?.username || user?.name || '特约创作者'}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="px-1.5 py-0.5 rounded bg-slate-100 font-mono">
-                      全球紧张度 {initialTension}%
-                    </span>
-                    <span className="px-1.5 py-0.5 rounded bg-slate-100 font-mono">
-                      战税 {warTaxCap}%
-                    </span>
-                    <span className="px-1.5 py-0.5 rounded bg-slate-100 font-mono">
-                      同盟上限 {maxAllies}国
-                    </span>
-                    <span className="px-1.5 py-0.5 rounded bg-slate-100 font-medium">
-                      {visibility === 'public' ? '公开' : '私有'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
         )}
 
-        {/* Footer actions */}
-        {isCreator ? (
-          <div className="sticky bottom-0 z-20 px-4 py-3 sm:px-6 sm:py-3.5 border-t border-slate-200/80 bg-white/95 backdrop-blur-md flex items-center justify-between gap-2 shadow-[0_-4px_16px_rgba(0,0,0,0.03)] pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
+        {/* 底部操作工具栏 */}
+        {isCreator && (
+          <div className="border-t border-slate-200/80 bg-white px-4 py-3 sm:px-6 sm:py-3.5 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
-              {currentStep > 1 && (
+              {currentStep === 2 && (
                 <button
                   type="button"
-                  onClick={handlePrevStep}
-                  className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer flex items-center gap-1 active:scale-95"
+                  onClick={() => setCurrentStep(1)}
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer flex items-center gap-1 active:scale-95"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
-                  <span>上一步</span>
+                  <span>上一步：修改剧本设置</span>
                 </button>
               )}
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3 py-2 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-800 transition cursor-pointer"
+                className="px-3.5 py-2 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-800 transition cursor-pointer"
               >
                 取消
               </button>
             </div>
 
-            <div>
-              {currentStep < 3 ? (
+            <div className="flex items-center gap-2">
+              {currentStep === 1 ? (
                 <button
                   type="button"
-                  onClick={handleNextStep}
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition shadow-xs cursor-pointer flex items-center gap-1 active:scale-95"
+                  onClick={handleProceedToNationCreation}
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-xs cursor-pointer flex items-center gap-1 active:scale-95"
                 >
-                  <span>下一步</span>
+                  <span>下一步：国家建立页</span>
                   <ChevronRight className="w-4 h-4" />
                 </button>
               ) : (
@@ -1018,33 +1257,19 @@ export const WorkspaceCreationWizard: React.FC<WorkspaceCreationWizardProps> = (
                   type="button"
                   onClick={handleSubmit}
                   disabled={isSubmitting || !quota.allowed}
-                  className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white text-xs font-bold transition shadow-sm cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-95 text-white text-xs font-bold transition shadow-sm cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                   <span>
                     {isSubmitting
-                      ? '正在创世发布...'
+                      ? '正在构筑发布...'
                       : !quota.allowed
-                      ? '已达3个剧本上限（需先删除已有剧本）'
-                      : '立即发布推演工作区'}
+                      ? '配额已满（需先删除旧剧本）'
+                      : '完成构筑并启动推演'}
                   </span>
                 </button>
               )}
             </div>
-          </div>
-        ) : (
-          <div className="px-5 py-3 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between text-xs text-slate-500 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
-            <span className="flex items-center gap-1.5 text-[11px] text-amber-800">
-              <Shield className="w-3.5 h-3.5 text-amber-600" />
-              <span>仅已注册的认证创作者拥有沙盘构筑发布权限</span>
-            </span>
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-1.5 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 transition cursor-pointer border border-slate-200"
-            >
-              关闭
-            </button>
           </div>
         )}
       </motion.div>

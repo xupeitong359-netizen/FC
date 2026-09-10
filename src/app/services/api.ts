@@ -94,6 +94,7 @@ interface DBNation {
  currency: string;
  currencyRate?: number;
  flagColor: string;
+ nameFont?: string;
  emblemIcon: string;
  createdAt: string;
  updatedAt: string;
@@ -1190,6 +1191,8 @@ export const api = {
     if (p.currency) updates.currency = String(p.currency).trim();
     if (typeof p.currencyRate === 'number' && p.currencyRate > 0) updates.currencyRate = p.currencyRate;
     if (p.flagColor) updates.flagColor = p.flagColor;
+    if (p.nameFont) updates.nameFont = p.nameFont;
+    if (Array.isArray(p.provinces)) updates.provinces = p.provinces;
     if (p.emblemIcon) updates.emblemIcon = p.emblemIcon;
     if (p.partyNames && typeof p.partyNames === 'object') updates.partyNames = p.partyNames;
     if (p.rulingPartyId) updates.rulingPartyId = p.rulingPartyId;

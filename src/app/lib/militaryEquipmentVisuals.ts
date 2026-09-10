@@ -68,7 +68,7 @@ export const MILITARY_EQUIPMENT_MAP: Record<string, MilitaryEquipmentAsset> = {
  },
  manpad_at: {
   artKey: 'manpad_at',
-  historicalModel: 'RPzB 54 坦克杀手 (Panzerschreck)',
+  historicalModel: 'RPzB 54 坦克杀手',
   eraLabel: '1943 步兵反装甲',
   specSnippet: '88mm 空心装药破甲火箭弹 · 穿甲深度 230mm 均质装甲',
   category: 'infantry',
@@ -77,7 +77,7 @@ export const MILITARY_EQUIPMENT_MAP: Record<string, MilitaryEquipmentAsset> = {
  },
  night_vision: {
   artKey: 'night_vision',
-  historicalModel: 'ZG 1229 吸血鬼 (Vampir) 红外夜视仪',
+  historicalModel: 'ZG 1229 吸血鬼红外夜视仪 红外夜视仪',
   eraLabel: '1944 单兵夜视',
   specSnippet: '主动红外探照大灯 + 像增强器目镜 · 探测距离 200m',
   category: 'infantry',
@@ -133,7 +133,7 @@ export const MILITARY_EQUIPMENT_MAP: Record<string, MilitaryEquipmentAsset> = {
  },
  logistics_depot: {
   artKey: 'logistics_depot',
-  historicalModel: '欧宝闪电 3吨标准越野卡车 (Opel Blitz)',
+  historicalModel: '欧宝闪电 3吨标准越野卡车',
   eraLabel: '1936 战备辎重',
   specSnippet: '3.6L 6缸汽油机 · 载重 3.3 吨 · 军用全地形箱式后斗',
   category: 'support',
@@ -180,7 +180,7 @@ export const MILITARY_EQUIPMENT_MAP: Record<string, MilitaryEquipmentAsset> = {
  },
  rocket_artillery: {
   artKey: 'rocket_artillery',
-  historicalModel: 'BM-13 喀秋莎多管火箭炮 (Katyusha)',
+  historicalModel: 'BM-13 喀秋莎多管火箭炮',
   eraLabel: '1942 火箭压制',
   specSnippet: '132mm M-13 火箭弹 · 16轨发射架 · 7秒倾泻全部齐射',
   category: 'artillery',
@@ -191,7 +191,7 @@ export const MILITARY_EQUIPMENT_MAP: Record<string, MilitaryEquipmentAsset> = {
  // ================= 4. 装甲战车与坦克 (ARMOR) =================
  tank_light: {
   artKey: 'tank_light',
-  historicalModel: '二号坦克 C型 (Panzerkampfwagen II)',
+  historicalModel: '二号坦克 C型',
   eraLabel: '1936 轻型巡航',
   specSnippet: '20mm KwK 30 机炮 · 7.92mm 同轴机枪 · 极速 40 km/h · 重8.9吨',
   category: 'armor',
@@ -200,7 +200,7 @@ export const MILITARY_EQUIPMENT_MAP: Record<string, MilitaryEquipmentAsset> = {
  },
  tank_medium: {
   artKey: 'tank_medium',
-  historicalModel: '四号坦克 G/H型 (Panzerkampfwagen IV)',
+  historicalModel: '四号坦克 G/H型',
   eraLabel: '1938 主力中型',
   specSnippet: '长身管 7.5 cm KwK 40 L/48 · 80mm 正面装甲 · 重25吨',
   category: 'armor',
@@ -209,7 +209,7 @@ export const MILITARY_EQUIPMENT_MAP: Record<string, MilitaryEquipmentAsset> = {
  },
  tank_heavy: {
   artKey: 'tank_heavy',
-  historicalModel: '虎式重型坦克 (Tiger I / Panzer VI)',
+  historicalModel: '虎式重型坦克',
   eraLabel: '1942 突破重坦',
   specSnippet: '8.8 cm KwK 36 L/56 · 100mm 垂直装甲 · 迈巴赫 HL230 700马力',
   category: 'armor',
@@ -218,16 +218,16 @@ export const MILITARY_EQUIPMENT_MAP: Record<string, MilitaryEquipmentAsset> = {
  },
  tank_modern: {
   artKey: 'tank_modern',
-  historicalModel: '黑豹中型战车 (Panzer V Panther)',
+  historicalModel: '黑豹中型战车',
   eraLabel: '1944 现代化主战',
   specSnippet: '7.5 cm KwK 42 L/70 (超长身管) · 80mm 55度大倾斜装甲 · 46 km/h',
   category: 'armor',
   imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Panther_Ausf._A_Saumur.jpg/640px-Panther_Ausf._A_Saumur.jpg',
-  blueprintDetails: '融合倾斜装甲哲学与高倍径反坦克炮，被公认为现代主战坦克(MBT)雏形。',
+  blueprintDetails: '融合倾斜装甲哲学与高倍径反坦克炮，被公认为现代主战坦克雏形。',
  },
  tank_destroyer: {
   artKey: 'tank_destroyer',
-  historicalModel: '猎豹坦克歼击车 (Jagdpanther)',
+  historicalModel: '猎豹坦克歼击车',
   eraLabel: '1943 猎歼战车',
   specSnippet: '8.8 cm Pak 43/3 L/71 · 80mm 大倾斜一体化固定战斗室',
   category: 'armor',
@@ -236,7 +236,7 @@ export const MILITARY_EQUIPMENT_MAP: Record<string, MilitaryEquipmentAsset> = {
  },
  sp_artillery: {
   artKey: 'sp_artillery',
-  historicalModel: 'M7 牧师 105mm 自行火炮 (M7 Priest)',
+  historicalModel: 'M7 牧师 105mm 自行火炮',
   eraLabel: '1942 自行火炮',
   specSnippet: 'M2A1 105mm 榴弹炮 · 谢尔曼坦克底盘 · 顶部配备 .50 机枪圆环座',
   category: 'armor',
@@ -267,7 +267,7 @@ export const MILITARY_EQUIPMENT_MAP: Record<string, MilitaryEquipmentAsset> = {
  },
  synthetic_fuel: {
   artKey: 'synthetic_fuel',
-  historicalModel: '费托合成 (Fischer-Tropsch) 煤制油工厂',
+  historicalModel: '费托合成 煤制油工厂',
   eraLabel: '1940 合成燃料',
   specSnippet: '高压催化裂解塔 · 煤炭水煤气转化 · 生产高辛烷值航空煤油',
   category: 'industry',
@@ -289,7 +289,7 @@ export const MILITARY_EQUIPMENT_MAP: Record<string, MilitaryEquipmentAsset> = {
  // ================= 6. 航空战机与空优 (AIR) =================
  fighter_early: {
   artKey: 'fighter_early',
-  historicalModel: '梅塞施密特 Bf 109E (Messerschmitt)',
+  historicalModel: '梅塞施密特 Bf 109E',
   eraLabel: '1936 早期全金属单翼',
   specSnippet: 'DB 601 倒V型液冷 1100马力 · 2×20mm 航炮 + 2×7.92mm 机枪 · 560 km/h',
   category: 'air',
@@ -298,7 +298,7 @@ export const MILITARY_EQUIPMENT_MAP: Record<string, MilitaryEquipmentAsset> = {
  },
  fighter_advanced: {
   artKey: 'fighter_advanced',
-  historicalModel: '福克-沃尔夫 Fw 190A 百舌鸟 (Fw 190)',
+  historicalModel: '福克-沃尔夫 Fw 190A 百舌鸟',
   eraLabel: '1941 进阶截击机',
   specSnippet: '宝马 BMW 801 14缸星型 1700马力 · 4×20mm MG 151/20 航炮 · 656 km/h',
   category: 'air',
@@ -307,7 +307,7 @@ export const MILITARY_EQUIPMENT_MAP: Record<string, MilitaryEquipmentAsset> = {
  },
  fighter_jet: {
   artKey: 'fighter_jet',
-  historicalModel: '梅塞施密特 Me 262 飞燕 (Schwalbe)',
+  historicalModel: '梅塞施密特 Me 262 飞燕',
   eraLabel: '1944 喷气战斗机',
   specSnippet: '2×容克斯 Jumo 004 轴流喷气机 · 4×30mm MK 108 航炮 · 870 km/h',
   category: 'air',
@@ -316,7 +316,7 @@ export const MILITARY_EQUIPMENT_MAP: Record<string, MilitaryEquipmentAsset> = {
  },
  fighter_cas: {
   artKey: 'fighter_cas',
-  historicalModel: '容克斯 Ju 87 斯图卡俯冲轰炸机 (Stuka)',
+  historicalModel: '容克斯 Ju 87 斯图卡俯冲轰炸机',
   eraLabel: '1938 俯冲支援机',
   specSnippet: '倒鸥型机翼 · 自动俯冲拉起配平 · 挂载 500kg 航弹与“耶利哥号角”风笛',
   category: 'air',
@@ -336,7 +336,7 @@ export const MILITARY_EQUIPMENT_MAP: Record<string, MilitaryEquipmentAsset> = {
  // ================= 7. 海军舰艇与远洋 (NAVAL) =================
  destroyer: {
   artKey: 'destroyer',
-  historicalModel: '弗莱彻级舰队驱逐舰 (Fletcher-class)',
+  historicalModel: '弗莱彻级舰队驱逐舰',
   eraLabel: '1936 舰队驱逐舰',
   specSnippet: '排水量 2,500吨 · 5×127mm 38倍径高平两用炮 · 2×五联装 533mm 鱼雷管 · 36.5节',
   category: 'naval',
@@ -345,7 +345,7 @@ export const MILITARY_EQUIPMENT_MAP: Record<string, MilitaryEquipmentAsset> = {
  },
  submarine_ocean: {
   artKey: 'submarine_ocean',
-  historicalModel: 'VII-C 型远洋破交潜艇 (Type VII U-Boat)',
+  historicalModel: 'VII-C 型远洋破交潜艇',
   eraLabel: '1938 远洋破交潜艇',
   specSnippet: '水下排水量 871吨 · 5×533mm 鱼雷管 (14枚鱼雷) · 潜深 220米 · 狼群战术主力',
   category: 'naval',
@@ -354,7 +354,7 @@ export const MILITARY_EQUIPMENT_MAP: Record<string, MilitaryEquipmentAsset> = {
  },
  battleship: {
   artKey: 'battleship',
-  historicalModel: '俾斯麦级超无畏战列舰 (Bismarck-class)',
+  historicalModel: '俾斯麦级超无畏战列舰',
   eraLabel: '1940 巨舰大炮战列舰',
   specSnippet: '满载排水量 50,300吨 · 4座双联装 380mm 47倍径主炮 · 主装甲带 320mm · 30节',
   category: 'naval',
@@ -363,7 +363,7 @@ export const MILITARY_EQUIPMENT_MAP: Record<string, MilitaryEquipmentAsset> = {
  },
  carrier: {
   artKey: 'carrier',
-  historicalModel: '埃塞克斯级舰队航空母舰 (Essex-class)',
+  historicalModel: '埃塞克斯级舰队航空母舰',
   eraLabel: '1942 全通甲板舰队航母',
   specSnippet: '标准排水量 27,100吨 · 载机量 90-100架舰载机 · 3部飞机升降机 · 33节航速',
   category: 'naval',
@@ -374,7 +374,7 @@ export const MILITARY_EQUIPMENT_MAP: Record<string, MilitaryEquipmentAsset> = {
  // ================= 8. 电子雷达与工程 (ELECTRONICS) =================
  diff_engine: {
   artKey: 'diff_engine',
-  historicalModel: '恩尼格玛 (Enigma) 密码机与图灵炸弹机',
+  historicalModel: '恩尼格玛 密码机与图灵炸弹机',
   eraLabel: '1936 密码与机电计算机',
   specSnippet: '三转子互换置乱接线板 · 1.58×10^20 种密钥可能 · 战时情报破译中枢',
   category: 'electronics',
@@ -394,7 +394,7 @@ export const MILITARY_EQUIPMENT_MAP: Record<string, MilitaryEquipmentAsset> = {
  },
  atomic_reactor: {
   artKey: 'atomic_reactor',
-  historicalModel: '芝加哥一号堆 (Chicago Pile-1) 重核反应堆',
+  historicalModel: '芝加哥一号堆 重核反应堆',
   eraLabel: '1944 重核工程',
   specSnippet: '石墨慢化中子 · 纯化金属铀晶格 · 人类首次实现自持可控核裂变链式反应',
   category: 'electronics',

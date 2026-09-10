@@ -49,9 +49,9 @@ export const WorldMap: React.FC<WorldMapProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<MapViewMode>('political');
-  const [showGrid, setShowGrid] = useState<boolean>(true);
+  const [showGrid, setShowGrid] = useState<boolean>(false);
   const [showLabels, setShowLabels] = useState<boolean>(true);
-  const [showLegend, setShowLegend] = useState<boolean>(true);
+  const [showLegend, setShowLegend] = useState<boolean>(false);
 
   // Pan & Zoom state
   const [transform, setTransform] = useState<{ x: number; y: number; k: number }>({
@@ -422,7 +422,7 @@ export const WorldMap: React.FC<WorldMapProps> = ({
                       ? '#ffffff'
                       : '#cbd5e1'
                   }
-                  strokeWidth={isSelected ? 2.5 : isMatched ? 2 : isHovered ? 1.8 : 1}
+                  strokeWidth={isSelected ? 1.8 : isMatched ? 1.2 : isHovered ? 1.0 : 0.6}
                   strokeLinejoin="round"
                   filter={isSelected ? 'url(#tile-glow)' : undefined}
                   className="hover:opacity-95 transition-opacity"
@@ -478,81 +478,114 @@ export const WorldMap: React.FC<WorldMapProps> = ({
       </svg>
 
       {/* Floating Hover Province Tooltip */}
-      {hoveredTile && !isDragging && (
-        <div
-          id="territory-hover-tooltip"
-          className="absolute z-30 pointer-events-none bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-xl p-3 shadow-xl text-slate-800 text-xs w-64 animate-in fade-in zoom-in-95 duration-100"
-          style={{
-            left: Math.min(window.innerWidth - 300, mousePos.x + 16),
-            top: Math.min(window.innerHeight - 200, mousePos.y + 16),
-          }}
-        >
-          <div className="flex items-center justify-between border-b border-slate-100 pb-1.5 mb-1.5">
-            <div className="flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-indigo-600" />
-              <span className="font-bold text-slate-900 text-sm">{hoveredTile.name}</span>
-            </div>
-            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
-              {hoveredTile.id}
-            </span>
-          </div>
+      {hoveredTile && !isDragging && (() => {
+        const CARD_W = 240;
+        const CARD_H = 140;
+        let left = mousePos.x + 14;
+        let top = mousePos.y + 14;
+        if (typeof window !== 'undefined') {
+          if (left + CARD_W > window.innerWidth - 16) {
+            left = Math.max(12, mousePos.x - CARD_W - 14);
+          }
+          if (top + CARD_H > window.innerHeight - 72) {
+            top = Math.max(12, mousePos.y - CARD_H - 14);
+          }
+        }
 
-          <div className="space-y-1">
-            <div className="flex justify-between items-center text-[11px]">
-              <span className="text-slate-500">所属主权：</span>
-              {hoveredTile.countryId ? (
-                (() => {
-                  const country = countryMap.get(hoveredTile.countryId);
-                  return country ? (
-                    <span className="font-semibold flex items-center gap-1" style={{ color: country.color }}>
-                      <EmblemIcon name={country.flagEmblem} size={12} />
-                      {country.name}
-                    </span>
-                  ) : (
-                    <span className="text-slate-400">未知政权</span>
-                  );
-                })()
-              ) : (
-                <span className="text-slate-500 font-medium">中立开拓荒野</span>
-              )}
-            </div>
+        const isDocked = isPaintingMode;
 
-            <div className="flex justify-between text-[11px]">
-              <span className="text-slate-500">地理板块：</span>
-              <span className="font-medium text-slate-700">{hoveredTile.regionZone}</span>
-            </div>
-
-            <div className="flex justify-between text-[11px]">
-              <span className="text-slate-500">地形类型：</span>
-              <span className="font-medium text-slate-700">
-                {hoveredTile.terrain === 'plains' && '沃野平原'}
-                {hoveredTile.terrain === 'hills' && '丘陵高地'}
-                {hoveredTile.terrain === 'mountains' && '险峻山脉'}
-                {hoveredTile.terrain === 'coastal' && '沿海半岛'}
-                {hoveredTile.terrain === 'islands' && '外海群岛'}
-                {hoveredTile.terrain === 'basin' && '肥沃盆地'}
-                {hoveredTile.terrain === 'desert' && '赤荒砂原'}
+        return (
+          <>
+            {isDocked && (
+              <div
+                className="pointer-events-none absolute z-30 px-2 py-0.5 rounded-full bg-slate-900/80 text-white text-[10px] border border-slate-700/60 shadow-xs flex items-center gap-1.5 whitespace-nowrap select-none"
+                style={{
+                  left: `${Math.max(10, mousePos.x + 12)}px`,
+                  top: `${Math.max(10, mousePos.y - 26)}px`,
+                }}
+              >
+                <span className="font-semibold">{hoveredTile.name}</span>
+                <span className="text-slate-300 font-mono">#{hoveredTile.id}</span>
+              </div>
+            )}
+            <div
+              id="territory-hover-tooltip"
+              className={`absolute z-30 pointer-events-none bg-white/98 backdrop-blur-md border border-slate-200/90 rounded-lg p-2.5 shadow-lg text-slate-800 text-xs w-[236px] transition-all duration-100 ease-out ${
+                isDocked ? 'bottom-4 left-4' : ''
+              }`}
+              style={!isDocked ? {
+                left: `${left}px`,
+                top: `${top}px`,
+              } : undefined}
+            >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5 mb-1.5">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <MapPin className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <span className="font-semibold text-slate-900 text-xs truncate">{hoveredTile.name}</span>
+              </div>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-600 shrink-0">
+                #{hoveredTile.id}
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-1 pt-1.5 border-t border-slate-100 text-[10px] text-slate-600">
-              <div>
-                人口：<span className="font-bold text-slate-800">{hoveredTile.basePopulation} 万人</span>
+            <div className="space-y-1">
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="text-slate-500">所属主权</span>
+                {hoveredTile.countryId ? (
+                  (() => {
+                    const country = countryMap.get(hoveredTile.countryId);
+                    return country ? (
+                      <span className="font-medium flex items-center gap-1 text-slate-800 truncate max-w-[120px]">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: country.color }} />
+                        {country.name}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">未知政权</span>
+                    );
+                  })()
+                ) : (
+                  <span className="text-slate-500 font-medium">中立开拓荒野</span>
+                )}
               </div>
-              <div>
-                工业：<span className="font-bold text-slate-800">{hoveredTile.baseIndustry} 点</span>
-              </div>
-            </div>
 
-            {hoveredTile.isCapitalCity && (
-              <div className="mt-1.5 px-2 py-1 rounded bg-rose-50 text-rose-700 text-[11px] font-bold flex items-center gap-1 border border-rose-200">
-                <Star className="w-3 h-3 fill-rose-500 text-rose-500" />
-                <span>国家法定首都所在地（{hoveredTile.capitalName}）</span>
+              <div className="flex justify-between text-[11px]">
+                <span className="text-slate-500">地理板块</span>
+                <span className="font-medium text-slate-700">{hoveredTile.regionZone}</span>
               </div>
-            )}
+
+              <div className="flex justify-between text-[11px]">
+                <span className="text-slate-500">地形类型</span>
+                <span className="font-medium text-slate-700">
+                  {hoveredTile.terrain === 'plains' && '沃野平原'}
+                  {hoveredTile.terrain === 'hills' && '丘陵高地'}
+                  {hoveredTile.terrain === 'mountains' && '险峻山脉'}
+                  {hoveredTile.terrain === 'coastal' && '沿海半岛'}
+                  {hoveredTile.terrain === 'islands' && '外海群岛'}
+                  {hoveredTile.terrain === 'basin' && '肥沃盆地'}
+                  {hoveredTile.terrain === 'desert' && '赤荒砂原'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-1 pt-1.5 border-t border-slate-100 text-[10px] text-slate-600 font-mono">
+                <div>
+                  人口：<span className="font-medium text-slate-800">{hoveredTile.basePopulation} 万</span>
+                </div>
+                <div>
+                  工业：<span className="font-medium text-slate-800">{hoveredTile.baseIndustry} 点</span>
+                </div>
+              </div>
+
+              {hoveredTile.isCapitalCity && (
+                <div className="mt-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 text-[10px] font-medium flex items-center gap-1 border border-amber-200">
+                  <Star className="w-3 h-3 fill-amber-500 text-amber-500 shrink-0" />
+                  <span>国家首都（{hoveredTile.capitalName}）</span>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        </>
+        );
+      })()}
 
       {/* Bottom Floating Legend Bar */}
       {showLegend && (

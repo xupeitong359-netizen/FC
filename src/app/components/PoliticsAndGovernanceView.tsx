@@ -433,7 +433,7 @@ export const PoliticsAndGovernanceView: React.FC<PoliticsAndGovernanceViewProps>
      <div className="bg-white border border-slate-200/90 rounded-[4px] p-4 shadow-2xs space-y-3">
       <div className="flex items-center justify-between border-b border-slate-100 pb-2">
        <div>
-        <h3 className="text-xs font-bold text-slate-900">国家体制修正效果 (National Modifiers)</h3>
+        <h3 className="text-xs font-bold text-slate-900">国家体制修正效果</h3>
         <p className="text-[10px] text-slate-500 font-mono">BUFFS & DEBUFFS APPLIED TO INDUSTRY & MILITARY</p>
        </div>
        <span className="text-slate-500 font-mono text-[10px]">全局生效中</span>

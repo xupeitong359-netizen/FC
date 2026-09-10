@@ -127,14 +127,22 @@ function applySettingsToDOM(settings: AppSettings): void {
     root.classList.remove('high-contrast-mode');
   }
 
-  // 3. Theme accent variables
+  // 3. System color theme (dark/light) - 整体偏黑深色系
+  const isDark = settings.mapTheme === 'grey';
+  if (isDark) {
+    root.classList.add('dark');
+  } else {
+    root.classList.remove('dark');
+  }
+
+  // 4. Theme accent variables
   const accent = settings.themeAccent;
   root.style.setProperty('--theme-accent', accent);
   root.style.setProperty('--color-primary', accent);
   root.style.setProperty('--primary', accent);
   root.style.setProperty('--ring', accent);
 
-  // 4. Inject or update dynamic theme stylesheet
+  // 5. Inject or update dynamic theme stylesheet
   let styleEl = document.getElementById('virtual-world-dynamic-accent') as HTMLStyleElement | null;
   if (!styleEl) {
     styleEl = document.createElement('style');
@@ -162,9 +170,81 @@ function applySettingsToDOM(settings: AppSettings): void {
     .high-contrast-mode .border-slate-200 {
       border-color: #cbd5e1 !important;
     }
+
+    /* 全局系统深色系 (整体偏黑战备暗色质感) */
+    html.dark {
+      color-scheme: dark;
+      background-color: #0B0F19 !important;
+    }
+    html.dark body {
+      background-color: #0B0F19 !important;
+      color: #F1F5F9 !important;
+    }
+    html.dark .bg-white {
+      background-color: #111827 !important;
+    }
+    html.dark .bg-slate-50,
+    html.dark .bg-slate-50\\/70,
+    html.dark .bg-slate-50\\/80,
+    html.dark .bg-slate-50\\/90 {
+      background-color: #0B0F19 !important;
+    }
+    html.dark .bg-slate-100 {
+      background-color: #1A2234 !important;
+    }
+    html.dark .bg-slate-200 {
+      background-color: #242E42 !important;
+    }
+    html.dark .bg-\\[\\#F7F9FC\\] {
+      background-color: #151D2C !important;
+    }
+    html.dark .bg-\\[\\#F8F7FF\\] {
+      background-color: #1C1838 !important;
+    }
+    html.dark .bg-white\\/95,
+    html.dark .bg-white\\/90,
+    html.dark .bg-white\\/80 {
+      background-color: rgba(17, 24, 39, 0.94) !important;
+    }
+    html.dark .text-slate-900,
+    html.dark .text-\\[\\#0F172A\\] {
+      color: #F8FAFC !important;
+    }
+    html.dark .text-slate-800 {
+      color: #E2E8F0 !important;
+    }
+    html.dark .text-slate-700 {
+      color: #CBD5E1 !important;
+    }
+    html.dark .text-slate-600,
+    html.dark .text-\\[\\#64748B\\] {
+      color: #94A3B8 !important;
+    }
+    html.dark .text-slate-500 {
+      color: #718096 !important;
+    }
+    html.dark .border-slate-200,
+    html.dark .border-slate-200\\/90,
+    html.dark .border-slate-200\\/80,
+    html.dark .border-slate-100,
+    html.dark .border-\\[\\#E2E8F0\\] {
+      border-color: #1E293B !important;
+    }
+    html.dark .border-slate-300 {
+      border-color: #334155 !important;
+    }
+    html.dark input,
+    html.dark select,
+    html.dark textarea {
+      color: #F8FAFC !important;
+    }
+    html.dark input::placeholder,
+    html.dark textarea::placeholder {
+      color: #64748B !important;
+    }
   `;
 
-  // 5. Sync map theme
+  // 6. Sync map theme
   saveMapTheme(settings.mapTheme);
 }
 

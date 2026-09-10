@@ -173,6 +173,7 @@ export const NationalStatusBar: React.FC<NationalStatusBarProps> = ({
          className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-[3px] font-mono text-[11px] cursor-pointer transition"
          title={`${def.name}: 储备 ${res.stockpile} | 净变动 ${res.netDaily >= 0 ? '+' : ''}${res.netDaily}/日`}
         >
+         <img src={def.iconUrl} alt={def.name} className="w-3.5 h-3.5 object-contain shrink-0" />
          <span className="text-slate-600 font-bold text-[10px] uppercase">{def.name}</span>
          <span className="font-bold text-slate-800 tabular-nums">{res.stockpile}</span>
          <span className={`text-[9px] font-semibold ${res.netDaily >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
@@ -238,8 +239,8 @@ export const NationalStatusBar: React.FC<NationalStatusBarProps> = ({
          onClick={() => onNavigateTab('resources')}
          className="flex items-center gap-2 px-2.5 py-1 bg-white border border-slate-200 rounded-[3px] shadow-2xs hover:border-slate-300 transition cursor-pointer"
         >
-         <div className="px-1.5 py-0.5 rounded-[2px] bg-slate-900 text-white font-mono text-[9px] font-bold">
-          {def.icon}
+         <div className="w-6 h-6 rounded-[3px] flex items-center justify-center p-1 shrink-0" style={{ backgroundColor: def.color }}>
+          <img src={def.iconUrl} alt={def.name} className="w-full h-full object-contain" />
          </div>
          <div className="flex flex-col">
           <span className="text-[10px] text-slate-500 font-medium leading-none">{def.name}</span>

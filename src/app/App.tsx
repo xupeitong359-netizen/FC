@@ -2,7 +2,6 @@ import { TikTokIcon } from './components/TikTokIcon';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
- Crown,
  Search,
  Filter,
  SlidersHorizontal,
@@ -36,6 +35,7 @@ import {
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Nation, DiplomacyType, ConstructionQueueItem } from './types';
 import { api } from './services/api';
+import { workspaceService, MAX_CREATOR_WORKSPACES } from './services/workspaceService';
 import {
  STRATEGIC_BUILDINGS,
  StrategicBuildingType,
@@ -307,6 +307,12 @@ function MainApp() {
     showToast('仅已注册的创作者可构筑推演沙盘，请先注册/认证创作者账户');
     setAuthDefaultMode('register');
     setAuthModalOpen(true);
+    return;
+   }
+   // 先看创作者的工作区位置是否有空位，如果没有则无法进入页面
+   const quota = workspaceService.canCreateWorkspace(user?.id);
+   if (!quota.allowed) {
+    showToast(`自建工作区配额已满（${quota.currentCount}/${MAX_CREATOR_WORKSPACES}），无法进入创建页面，请先删除部分已有工作区以释放名额`);
     return;
    }
    setWorkspaceWizardOpen(true);
@@ -819,14 +825,14 @@ function MainApp() {
       {/* Top Header Row with Title and Independent Search/Filter Buttons on the Same Line */}
       <div className="px-2 sm:px-4 mb-3 sm:mb-4 flex items-center justify-between gap-3">
        <div className="flex items-center gap-2.5 min-w-0">
-        <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200/60 text-indigo-700 flex items-center justify-center flex-shrink-0">
-         <Crown className="w-4 h-4" />
+        <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center flex-shrink-0">
+         <Globe className="w-4 h-4 text-slate-600" />
         </div>
         <div className="min-w-0">
          <div className="flex items-baseline gap-2.5">
           <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight whitespace-nowrap">粉陆</h1>
           <span className="text-xs text-slate-500 font-medium whitespace-nowrap">
-           {totalNations} 个粉陆
+           {totalNations} 个实体
           </span>
          </div>
         </div>
@@ -898,20 +904,24 @@ function MainApp() {
       {isLoadingNations && nations.length === 0 ? (
        <div className="p-16 text-center">
         <span className="w-8 h-8 border-3 border-indigo-100 border-t-indigo-600 rounded-full animate-spin inline-block mb-3" />
-        <p className="text-sm text-slate-500">正在召集全球粉陆档案...</p>
+        <p className="text-sm text-slate-500">正在召集全球推演实体档案...</p>
        </div>
       ) : nations.length === 0 ? (
-       <div className="p-10 sm:p-14 text-center bg-white border border-slate-200/90 rounded-3xl shadow-xs max-w-lg mx-auto my-6 sm:my-10">
-        <div className="w-16 h-16 bg-indigo-50/90 border border-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-2xs">
-         <Crown className="w-8 h-8 text-indigo-500" />
+       <div className="p-8 sm:p-10 text-center bg-white border border-slate-200 rounded-2xl shadow-2xs max-w-md mx-auto my-6 sm:my-10">
+        <div className="w-11 h-11 bg-slate-50 border border-slate-200/80 rounded-xl flex items-center justify-center mx-auto mb-3.5 shadow-2xs">
+         <Compass className="w-5 h-5 text-slate-600 stroke-[1.75]" />
         </div>
-        <h3 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">未搜索到粉陆</h3>
-        <p className="text-sm text-slate-500 mt-1.5 mb-6 max-w-sm mx-auto leading-relaxed">
+        <h3 className="text-base font-bold text-slate-900 tracking-tight">
          {searchTerm.trim() || selectedRegime !== 'all' || selectedIdeology !== 'all'
-          ? '未匹配到符合当前检索条件的粉陆，您可以重置筛选条件或亲自开创全新粉陆！'
-          : '您可以清除搜索词或亲自开创属于您的第一个崭新粉陆！'}
+          ? '未匹配到推演实体'
+          : '暂无推演实体'}
+        </h3>
+        <p className="text-xs text-slate-500 mt-1.5 mb-5 max-w-xs mx-auto leading-relaxed">
+         {searchTerm.trim() || selectedRegime !== 'all' || selectedIdeology !== 'all'
+          ? '未匹配到符合检索条件的势力，您可以重置筛选或构建新的推演沙盘。'
+          : '当前列表尚无记录，您可以立即开创或构筑首个推演沙盘。'}
         </p>
-        <div className="flex flex-wrap items-center justify-center gap-3">
+        <div className="flex flex-wrap items-center justify-center gap-2.5">
          {(searchTerm.trim() || selectedRegime !== 'all' || selectedIdeology !== 'all') && (
           <button
            type="button"
@@ -920,18 +930,18 @@ function MainApp() {
             setSelectedRegime('all');
             setSelectedIdeology('all');
            }}
-           className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-semibold transition inline-flex items-center gap-1.5 cursor-pointer active:scale-95"
+           className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1.5 cursor-pointer active:scale-95"
           >
-           <RotateCcw className="w-4 h-4 text-slate-500" /> 重置筛选
+           <RotateCcw className="w-3.5 h-3.5 text-slate-500" /> 重置筛选
           </button>
          )}
          <button
           type="button"
           onClick={handleOpenWorkspaceWizard}
-          className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-xs transition inline-flex items-center gap-1.5 cursor-pointer active:scale-95"
+          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-xs transition inline-flex items-center gap-1.5 cursor-pointer active:scale-95"
           title={isCreator ? '分步构筑推演沙盘' : '仅已注册的创作者可以跳转'}
          >
-          <Plus className="w-4 h-4" /> 构筑推演沙盘
+          <Plus className="w-3.5 h-3.5" /> 构筑推演沙盘
          </button>
         </div>
        </div>
@@ -1217,12 +1227,17 @@ function MainApp() {
     user={user}
     onSuccess={(createdWs) => {
      setWorkspaceWizardOpen(false);
-     showToast(`已成功发布沙盘【${createdWs.name}】，立即启动地图圈地建国！`);
-     // 自动切换至全景地图并开启地图建国流程
-     setActiveTab('world_map');
-     setAutoStartMapNationMode(true);
-     setCreateNationModalOpen(true);
-     setIsMapSelectionMode(true);
+     const nations = createdWs.customNations || [];
+     if (nations.length > 0) {
+      showToast(`已构筑剧本【${createdWs.name}】与参演国家，立即进入推演工作区划拔疆域！`);
+      setWorkspaceModalOpen(true);
+     } else {
+      showToast(`已成功发布沙盘【${createdWs.name}】，立即启动地图圈地建国！`);
+      setActiveTab('world_map');
+      setAutoStartMapNationMode(true);
+      setCreateNationModalOpen(true);
+      setIsMapSelectionMode(true);
+     }
     }}
    />
 

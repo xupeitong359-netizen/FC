@@ -17,9 +17,12 @@ import {
   MessageCircle,
   HelpCircle,
   FolderGit2,
+  Copy,
+  Globe,
 } from 'lucide-react';
 import { TikTokIcon } from './TikTokIcon';
 import { User as UserType } from '../types';
+import { LOCATION_DATA, parseLocation } from '../lib/locationData';
 
 export interface DouyinProfileData {
   douyinName: string;
@@ -129,6 +132,63 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
   const [formGender, setFormGender] = useState(user.gender || '男');
   const [formBirthday, setFormBirthday] = useState(user.birthday || '2012-03-30');
   const [formLocation, setFormLocation] = useState(user.location || '朝鲜');
+
+  // 国家、省份、城市联动状态
+  const initialLoc = useMemo(() => parseLocation(user.location || '朝鲜'), [user.location]);
+  const [selectedCountry, setSelectedCountry] = useState(initialLoc.country);
+  const [selectedProvince, setSelectedProvince] = useState(initialLoc.province);
+  const [selectedCity, setSelectedCity] = useState(initialLoc.city);
+
+  const currentCountryObj = useMemo(() => {
+    return LOCATION_DATA.find((c) => c.name === selectedCountry) || LOCATION_DATA[0];
+  }, [selectedCountry]);
+
+  const currentProvinceObj = useMemo(() => {
+    return (
+      currentCountryObj?.provinces.find((p) => p.name === selectedProvince) ||
+      currentCountryObj?.provinces[0]
+    );
+  }, [currentCountryObj, selectedProvince]);
+
+  const handleCountryChange = (cName: string) => {
+    setSelectedCountry(cName);
+    const countryObj = LOCATION_DATA.find((c) => c.name === cName);
+    const firstProv = countryObj?.provinces[0];
+    const newProv = firstProv?.name || '';
+    const newCity = firstProv?.cities[0] || '';
+    setSelectedProvince(newProv);
+    setSelectedCity(newCity);
+
+    if (newCity && newProv) {
+      setFormLocation(`${cName} · ${newProv} · ${newCity}`);
+    } else if (newProv) {
+      setFormLocation(`${cName} · ${newProv}`);
+    } else {
+      setFormLocation(cName);
+    }
+  };
+
+  const handleProvinceChange = (pName: string) => {
+    setSelectedProvince(pName);
+    const provObj = currentCountryObj?.provinces.find((p) => p.name === pName);
+    const newCity = provObj?.cities[0] || '';
+    setSelectedCity(newCity);
+
+    if (newCity) {
+      setFormLocation(`${selectedCountry} · ${pName} · ${newCity}`);
+    } else {
+      setFormLocation(`${selectedCountry} · ${pName}`);
+    }
+  };
+
+  const handleCityChange = (cityName: string) => {
+    setSelectedCity(cityName);
+    if (cityName) {
+      setFormLocation(`${selectedCountry} · ${selectedProvince} · ${cityName}`);
+    } else {
+      setFormLocation(`${selectedCountry} · ${selectedProvince}`);
+    }
+  };
   const [formDouyinId, setFormDouyinId] = useState(user.douyinName || '77876871989');
   const [formServiceWidget, setFormServiceWidget] = useState(user.serviceWidget || '群聊');
   const [formCoverUrl, setFormCoverUrl] = useState(user.coverUrl || PRESET_COVERS[0].url);
@@ -197,70 +257,72 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 animate-fadeIn">
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 animate-fadeIn">
       {/* Container simulating high-end Douyin mobile view */}
-      <div className="relative w-full max-w-lg min-h-screen sm:min-h-0 sm:rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col my-auto">
-        {/* TOP COVER BANNER (图1头部封面预览) */}
-        <div className="relative w-full h-48 sm:h-52 bg-slate-800 overflow-hidden select-none">
+      <div className="relative w-full max-w-lg h-full sm:h-[92vh] sm:max-h-[860px] sm:rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col my-auto">
+        {/* TOP COVER BANNER (头部封面与居中高亮头像) */}
+        <div className="relative w-full bg-slate-800 select-none">
           {/* Cover Background Image with subtle overlay */}
-          <img
-            src={formCoverUrl}
-            alt="封面图"
-            className="w-full h-full object-cover transition-all duration-300 filter brightness-90"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/50" />
+          <div className="relative w-full h-44 sm:h-48 overflow-hidden">
+            <img
+              src={formCoverUrl}
+              alt="封面图"
+              className="w-full h-full object-cover transition-all duration-300 filter brightness-90"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/50" />
 
-          {/* Top Bar: Back Button & Change Cover Button */}
-          <div className="absolute top-3 inset-x-3 flex items-center justify-between z-10">
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center backdrop-blur-xs transition cursor-pointer"
-              title="返回主页"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
+            {/* Top Bar: Back Button & Change Cover Button */}
+            <div className="absolute top-3 inset-x-3 flex items-center justify-between z-10">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center backdrop-blur-xs transition cursor-pointer"
+                title="返回主页"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveSheet('cover')}
-              className="px-3 py-1 rounded-full bg-black/40 hover:bg-black/60 text-white text-xs font-medium backdrop-blur-xs transition flex items-center gap-1.5 cursor-pointer"
-            >
-              <Camera className="w-3.5 h-3.5" />
-              <span>更换封面</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => setActiveSheet('cover')}
+                className="px-3 py-1 rounded-full bg-black/40 hover:bg-black/60 text-white text-xs font-medium backdrop-blur-xs transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span>更换封面</span>
+              </button>
+            </div>
           </div>
 
-          {/* AVATAR AT CENTER BOTTOM (图1居中头像与更换头像遮罩) */}
-          <div className="absolute -bottom-8 inset-x-0 flex justify-center z-10">
+          {/* AVATAR AT CENTER - 扩大占比并置于封面边缘居中，完全不被遮挡 */}
+          <div className="relative -mt-12 sm:-mt-14 flex justify-center z-20">
             <div
               onClick={() => setActiveSheet('avatar')}
-              className="relative w-20 h-20 rounded-full border-3 border-white bg-slate-200 shadow-md overflow-hidden cursor-pointer group select-none"
+              className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white bg-slate-200 shadow-xl overflow-hidden cursor-pointer group select-none ring-1 ring-black/5"
               style={{ backgroundColor: formAvatarColor }}
             >
               {formAvatarUrl ? (
                 <img src={formAvatarUrl} alt="头像" className="w-full h-full object-cover" />
               ) : formAvatarEmoji ? (
-                <div className="w-full h-full flex items-center justify-center text-3xl">
+                <div className="w-full h-full flex items-center justify-center text-4xl sm:text-5xl">
                   {formAvatarEmoji}
                 </div>
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-white font-bold text-2xl">
+                <div className="w-full h-full flex items-center justify-center text-white font-bold text-3xl sm:text-4xl">
                   {formDouyinName.charAt(0).toUpperCase()}
                 </div>
               )}
 
               {/* Camera Hover / Touch Overlay */}
-              <div className="absolute inset-0 bg-black/35 group-hover:bg-black/50 flex flex-col items-center justify-center text-white transition-opacity">
-                <Camera className="w-4 h-4 mb-0.5" />
-                <span className="text-[10px] font-medium leading-none">更换头像</span>
+              <div className="absolute inset-0 bg-black/40 group-hover:bg-black/55 flex flex-col items-center justify-center text-white transition-opacity">
+                <Camera className="w-5 h-5 mb-1 text-white drop-shadow-xs" />
+                <span className="text-[11px] font-semibold leading-none drop-shadow-xs">更换头像</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* PROFILE COMPLETION BADGE (图1: 资料完成度 100%) */}
-        <div className="pt-11 pb-3 text-center border-b border-slate-100 flex items-center justify-center gap-1 text-xs text-slate-700 font-medium">
+        <div className="pt-3 pb-3 text-center border-b border-slate-100 flex items-center justify-center gap-1 text-xs text-slate-700 font-medium">
           <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center">
             <Check className="w-2.5 h-2.5 stroke-[3]" />
           </div>
@@ -268,7 +330,7 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
         </div>
 
         {/* GROUPED LIST ITEMS (图1标准列表配置) */}
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-100 text-sm">
+        <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-100 text-sm">
           {/* 1. 名字 */}
           <button
             type="button"
@@ -331,7 +393,7 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
           >
             <span className="text-slate-900 font-medium w-24 shrink-0">所在地</span>
             <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
-              <span className="text-slate-800 font-medium">{formLocation}</span>
+              <span className="text-slate-800 font-medium truncate max-w-[220px]">{formLocation}</span>
               <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
             </div>
           </button>
@@ -349,31 +411,32 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
             </div>
           </button>
 
-          {/* 7. 服务挂件 */}
-          <button
-            type="button"
-            onClick={() => setActiveSheet('serviceWidget')}
-            className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 transition cursor-pointer"
-          >
-            <span className="text-slate-900 font-medium w-24 shrink-0">服务挂件</span>
-            <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
-              <span className="text-slate-800 font-medium">{formServiceWidget}</span>
-              <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+          {/* 7. 专属创作代码（只读项） */}
+          <div className="w-full px-5 py-3.5 flex items-center justify-between text-left select-none bg-slate-50/40">
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-slate-900 font-medium">创作代码</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200/80 text-slate-500 font-medium tracking-wide">
+                只读
+              </span>
             </div>
-          </button>
-
-          {/* 8. 专属创作代码 (CR Code) */}
-          <button
-            type="button"
-            onClick={() => setActiveSheet('creatorCode')}
-            className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 transition cursor-pointer"
-          >
-            <span className="text-slate-900 font-medium w-24 shrink-0">创作代码</span>
             <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
-              <span className="text-slate-800 font-mono">{formCreatorId || creatorCode}</span>
-              <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+              <span className="text-slate-700 font-mono text-xs select-all">
+                {formCreatorId || creatorCode}
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(formCreatorId || creatorCode);
+                  showToast('创作代码已复制到剪贴板');
+                }}
+                className="p-1 hover:bg-slate-200/80 rounded text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                title="复制创作代码"
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </button>
             </div>
-          </button>
+          </div>
 
           {/* 9. 修改密码 */}
           <button
@@ -392,7 +455,7 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
         </div>
 
         {/* BOTTOM SAVE BAR */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
+        <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3 shrink-0">
           <button
             type="button"
             onClick={onClose}
@@ -414,17 +477,21 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
         {/* SUB-EDITORS SHEETS / MODALS (针对具体点击项弹出的小抽屉) */}
         <AnimatePresence>
           {activeSheet && (
-            <div className="absolute inset-0 z-30 bg-black/50 backdrop-blur-2xs flex flex-col justify-end sm:justify-center p-0 sm:p-4">
+            <div
+              onClick={() => setActiveSheet(null)}
+              className="absolute inset-0 z-50 bg-black/60 backdrop-blur-xs flex flex-col justify-end"
+            >
               <motion.div
-                initial={{ y: '100%', opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: '100%', opacity: 0 }}
-                transition={{ type: 'spring', damping: 25, stiffness: 280 }}
-                className="bg-white rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl max-h-[85vh] overflow-y-auto space-y-4"
+                onClick={(e) => e.stopPropagation()}
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+                className="w-full bg-white rounded-t-2xl p-5 shadow-2xl min-h-[62%] sm:min-h-[480px] max-h-[88%] flex flex-col justify-between space-y-4"
               >
                 {/* Modal Header */}
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <h4 className="text-sm font-bold text-slate-900">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">
+                  <h4 className="text-sm sm:text-base font-bold text-slate-900">
                     {activeSheet === 'cover' && '更换主页封面壁纸'}
                     {activeSheet === 'avatar' && '更换头像'}
                     {activeSheet === 'name' && '修改名字'}
@@ -433,8 +500,6 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
                     {activeSheet === 'birthday' && '修改生日'}
                     {activeSheet === 'location' && '修改所在地'}
                     {activeSheet === 'douyinId' && '修改抖音号'}
-                    {activeSheet === 'serviceWidget' && '设置服务挂件'}
-                    {activeSheet === 'creatorCode' && '设置专属创作代码'}
                     {activeSheet === 'password' && '修改登录密码'}
                   </h4>
                   <button
@@ -446,10 +511,11 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
                   </button>
                 </div>
 
-                {/* Content: COVER PICKER */}
+                {/* Sub-Editor Content Body */}
+                <div className="flex-1 flex flex-col min-h-0 overflow-y-auto pr-0.5">
+                  {/* Content: COVER PICKER */}
                 {activeSheet === 'cover' && (
                   <div className="space-y-4">
-                    <div className="text-xs text-slate-500">点击下方精选壁纸即可直接套用，或输入图片链接：</div>
                     <div className="grid grid-cols-2 gap-2.5">
                       {PRESET_COVERS.map((cov) => (
                         <div
@@ -508,8 +574,6 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
                 {/* Content: AVATAR PICKER */}
                 {activeSheet === 'avatar' && (
                   <div className="space-y-4">
-                    <div className="text-xs text-slate-500">选择精选插画头像、文字印记或自定义链接：</div>
-
                     {/* Presets */}
                     <div className="flex items-center gap-3">
                       {PRESET_AVATARS.map((av) => (
@@ -533,7 +597,7 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
 
                     {/* Emoji Matrix */}
                     <div className="space-y-1.5 pt-2 border-t border-slate-100">
-                      <label className="text-xs font-semibold text-slate-700">精选专属印记</label>
+                      <label className="text-xs font-semibold text-slate-700">精选印记</label>
                       <div className="grid grid-cols-8 gap-1 p-2 bg-slate-50 border border-slate-200 rounded-lg">
                         {EMOJI_OPTIONS.map((em) => (
                           <button
@@ -557,7 +621,7 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
 
                     {/* Colors */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-semibold text-slate-700">头像背景底色</label>
+                      <label className="text-xs font-semibold text-slate-700">背景底色</label>
                       <div className="grid grid-cols-5 gap-2">
                         {THEME_COLORS.map((c) => (
                           <button
@@ -575,7 +639,7 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
 
                     {/* Custom URL */}
                     <div className="space-y-1.5 pt-2 border-t border-slate-100">
-                      <label className="text-xs font-semibold text-slate-700">自定义网络头像 URL</label>
+                      <label className="text-xs font-semibold text-slate-700">网络头像 URL</label>
                       <div className="flex gap-2">
                         <input
                           type="url"
@@ -606,14 +670,11 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
                 {/* Content: NAME */}
                 {activeSheet === 'name' && (
                   <div className="space-y-3">
-                    <label className="text-xs text-slate-500">
-                      好名字更容易让其他创作者记住你（例如：联合玲玉 QvQ）：
-                    </label>
                     <input
                       type="text"
                       value={formDouyinName}
                       onChange={(e) => setFormDouyinName(e.target.value)}
-                      placeholder="输入您的名字"
+                      placeholder="输入名字"
                       className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:border-[#6B50F0] focus:outline-hidden"
                     />
                   </div>
@@ -621,16 +682,13 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
 
                 {/* Content: BIO */}
                 {activeSheet === 'bio' && (
-                  <div className="space-y-3">
-                    <label className="text-xs text-slate-500">
-                      介绍你的作品风格、联盟阵营或创作理念（支持多行排版）：
-                    </label>
+                  <div className="flex-1 flex flex-col space-y-3">
                     <textarea
-                      rows={4}
+                      rows={6}
                       value={formBio}
                       onChange={(e) => setFormBio(e.target.value)}
                       placeholder="填写个人简介..."
-                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:bg-white focus:border-[#6B50F0] focus:outline-hidden resize-none leading-relaxed"
+                      className="w-full flex-1 min-h-[180px] p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white focus:border-[#6B50F0] focus:outline-hidden resize-none leading-relaxed"
                     />
                   </div>
                 )}
@@ -662,7 +720,6 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
                 {/* Content: BIRTHDAY */}
                 {activeSheet === 'birthday' && (
                   <div className="space-y-3">
-                    <label className="text-xs text-slate-500">选择出生日期（主页将自动推算展示年龄）：</label>
                     <input
                       type="date"
                       value={formBirthday}
@@ -672,24 +729,64 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
                   </div>
                 )}
 
-                {/* Content: LOCATION */}
+                {/* Content: LOCATION (国家 / 省份 / 城市 三级联动选择) */}
                 {activeSheet === 'location' && (
                   <div className="space-y-3">
-                    <label className="text-xs text-slate-500">设置常驻所在地或地缘所属疆域：</label>
-                    <input
-                      type="text"
-                      value={formLocation}
-                      onChange={(e) => setFormLocation(e.target.value)}
-                      placeholder="例如：朝鲜、北京、上海、维也纳..."
-                      className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:border-[#6B50F0] focus:outline-hidden"
-                    />
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B50F0]" />
+                      <input
+                        type="text"
+                        value={formLocation}
+                        onChange={(e) => setFormLocation(e.target.value)}
+                        placeholder="输入或选择所在地"
+                        className="w-full h-10 pl-9 pr-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:border-[#6B50F0] focus:outline-hidden font-medium"
+                      />
+                    </div>
+
+                    {/* 三级级联选择器（国家、省份、城市） */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <select
+                        value={selectedCountry}
+                        onChange={(e) => handleCountryChange(e.target.value)}
+                        className="w-full h-9 px-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:border-[#6B50F0] focus:outline-hidden cursor-pointer"
+                      >
+                        {LOCATION_DATA.map((c) => (
+                          <option key={c.name} value={c.name}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={selectedProvince}
+                        onChange={(e) => handleProvinceChange(e.target.value)}
+                        className="w-full h-9 px-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:border-[#6B50F0] focus:outline-hidden cursor-pointer"
+                      >
+                        {currentCountryObj?.provinces.map((p) => (
+                          <option key={p.name} value={p.name}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={selectedCity}
+                        onChange={(e) => handleCityChange(e.target.value)}
+                        className="w-full h-9 px-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-medium focus:border-[#6B50F0] focus:outline-hidden cursor-pointer"
+                      >
+                        {currentProvinceObj?.cities.map((ct) => (
+                          <option key={ct} value={ct}>
+                            {ct}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 )}
 
                 {/* Content: DOUYIN ID */}
                 {activeSheet === 'douyinId' && (
                   <div className="space-y-3">
-                    <label className="text-xs text-slate-500">用于主页展示与一键复制核验（如 77876871989）：</label>
                     <input
                       type="text"
                       value={formDouyinId}
@@ -700,57 +797,34 @@ export const DouyinEditProfileModal: React.FC<DouyinEditProfileModalProps> = ({
                   </div>
                 )}
 
-                {/* Content: SERVICE WIDGET */}
-                {activeSheet === 'serviceWidget' && (
-                  <div className="space-y-3">
-                    <label className="text-xs text-slate-500">服务挂件展示（例如：群聊、官方粉丝团）：</label>
-                    <input
-                      type="text"
-                      value={formServiceWidget}
-                      onChange={(e) => setFormServiceWidget(e.target.value)}
-                      placeholder="例如：群聊"
-                      className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:border-[#6B50F0] focus:outline-hidden"
-                    />
-                  </div>
-                )}
-
-                {/* Content: CREATOR CODE */}
-                {activeSheet === 'creatorCode' && (
-                  <div className="space-y-3">
-                    <label className="text-xs text-slate-500">
-                      创作者代码用于归属判定与工坊防伪认证（如 CR-8829-XPL）：
-                    </label>
-                    <input
-                      type="text"
-                      value={formCreatorId}
-                      onChange={(e) => setFormCreatorId(e.target.value)}
-                      placeholder="例如：CR-43HV"
-                      className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:border-[#6B50F0] focus:outline-hidden font-mono"
-                    />
-                  </div>
-                )}
-
                 {/* Content: PASSWORD */}
                 {activeSheet === 'password' && (
                   <div className="space-y-3">
-                    <label className="text-xs text-slate-500">输入新密码（至少4位，留空则不修改）：</label>
                     <input
                       type="password"
                       value={formNewPassword}
                       onChange={(e) => setFormNewPassword(e.target.value)}
-                      placeholder="输入新密码"
+                      placeholder="新密码（留空则不修改）"
                       minLength={4}
                       className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:border-[#6B50F0] focus:outline-hidden"
                     />
                   </div>
                 )}
+                </div>
 
                 {/* Drawer Footer Button */}
-                <div className="pt-2 flex justify-end">
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5 shrink-0">
                   <button
                     type="button"
                     onClick={() => setActiveSheet(null)}
-                    className="px-4 py-2 bg-[#6B50F0] hover:bg-[#5B3FE0] text-white text-xs font-medium rounded-lg transition cursor-pointer"
+                    className="px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-medium transition cursor-pointer"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveSheet(null)}
+                    className="px-5 py-2 bg-[#6B50F0] hover:bg-[#5B3FE0] text-white text-xs font-semibold rounded-lg shadow-xs transition active:scale-95 cursor-pointer"
                   >
                     确定
                   </button>

@@ -118,7 +118,7 @@ export const NationalEconomyDashboard: React.FC<NationalEconomyDashboardProps> =
      <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
       <span className="flex items-center gap-1.5 font-bold text-amber-400 uppercase tracking-wide">
        <TrendingUp className="w-3.5 h-3.5" />
-       <span>国家生产总值 (GDP)</span>
+       <span>国家生产总值</span>
       </span>
       <span className="text-[10px] text-amber-500/80 group-hover:text-amber-300 font-mono flex items-center gap-0.5">
        <span>查看详值</span>
@@ -167,7 +167,7 @@ export const NationalEconomyDashboard: React.FC<NationalEconomyDashboardProps> =
      <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
       <span className="flex items-center gap-1.5 font-bold text-emerald-400 uppercase tracking-wide">
        <Coins className="w-3.5 h-3.5" />
-       <span>国库资金储备 (Treasury)</span>
+       <span>国库资金储备</span>
       </span>
       <span className="text-[10px] text-emerald-500/80 group-hover:text-emerald-300 font-mono flex items-center gap-0.5">
        <span>查看详值</span>
@@ -216,7 +216,7 @@ export const NationalEconomyDashboard: React.FC<NationalEconomyDashboardProps> =
      <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
       <span className="flex items-center gap-1.5 font-bold text-sky-400 uppercase tracking-wide">
        <CivilianFactoryPlantIcon size={14} className="text-sky-400" />
-       <span>民生工厂母网 (Civ Factories)</span>
+       <span>民生工厂母网</span>
       </span>
       <span className="text-[10px] text-sky-400 font-mono">工业母机</span>
      </div>
@@ -252,7 +252,7 @@ export const NationalEconomyDashboard: React.FC<NationalEconomyDashboardProps> =
      <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
       <span className="flex items-center gap-1.5 font-bold text-indigo-400 uppercase tracking-wide">
        <Percent className="w-3.5 h-3.5" />
-       <span>宏观法定税率 (Tax Rate)</span>
+       <span>宏观法定税率</span>
       </span>
       <span className="text-[10px] text-indigo-300 font-mono">财政律法</span>
      </div>
@@ -408,13 +408,13 @@ export const NationalEconomyDashboard: React.FC<NationalEconomyDashboardProps> =
 
       <div className="grid grid-cols-2 gap-2 text-xs font-mono">
        <div className="p-2.5 bg-[#060a12] border border-[#141e2d]">
-        <span className="text-[10px] text-slate-400 block">年化产值 (Annual GDP)</span>
+        <span className="text-[10px] text-slate-400 block">年化产值</span>
         <span className="font-bold text-slate-200 text-sm">
          {formatChineseNumber(stats.annualizedGDP, 2).shortText}
         </span>
        </div>
        <div className="p-2.5 bg-[#060a12] border border-[#141e2d]">
-        <span className="text-[10px] text-slate-400 block">年化税收 (Annual Tax)</span>
+        <span className="text-[10px] text-slate-400 block">年化税收</span>
         <span className="font-bold text-emerald-300 text-sm">
          {formatChineseNumber(stats.annualizedGDP * (stats.taxRate / 100), 2).shortText}
         </span>
@@ -444,7 +444,7 @@ export const NationalEconomyDashboard: React.FC<NationalEconomyDashboardProps> =
         <div className="flex items-center gap-2">
          <Zap className="w-4 h-4 text-amber-400" />
          <span className="text-xs font-black text-slate-200 uppercase tracking-wider">
-          综合经济效率矩阵 (Efficiency)
+          综合经济效率矩阵
          </span>
         </div>
         <span className="text-xs font-mono font-black text-amber-300 px-2 py-0.5 bg-amber-950/70 border border-amber-600/40">
@@ -690,7 +690,7 @@ export const NationalEconomyDashboard: React.FC<NationalEconomyDashboardProps> =
        <div className="flex items-center gap-2">
         <TrendingUp className="w-4 h-4 text-amber-400" />
         <span className="text-xs font-black text-slate-200 uppercase tracking-wider">
-         {inspectMetric === 'gdp' && '国家累计生产总值 (GDP) · 精确数据显微'}
+         {inspectMetric === 'gdp' && '国家累计生产总值 · 精确数据显微'}
          {inspectMetric === 'treasury' && '国家金库储备总额 · 精确资金账目'}
          {inspectMetric === 'daily_gdp' && '24h 每日民工 GDP 产出速度'}
          {inspectMetric === 'daily_revenue' && '24h 每日财政税收净流入'}
@@ -742,7 +742,7 @@ export const NationalEconomyDashboard: React.FC<NationalEconomyDashboardProps> =
        <span className="text-[11px] text-slate-400 block">各时间尺度经济流水测算：</span>
        <div className="grid grid-cols-2 gap-2 font-mono">
         <div className="p-2 bg-[#080d16] border border-[#182333]">
-         <span className="text-[10px] text-slate-400 block">每秒流水 (Per Second)</span>
+         <span className="text-[10px] text-slate-400 block">每秒流水</span>
          <span className="font-bold text-slate-200">
           +{inspectMetric === 'treasury' || inspectMetric === 'daily_revenue'
            ? (stats.perSecondRevenue).toFixed(2)
@@ -750,7 +750,7 @@ export const NationalEconomyDashboard: React.FC<NationalEconomyDashboardProps> =
          </span>
         </div>
         <div className="p-2 bg-[#080d16] border border-[#182333]">
-         <span className="text-[10px] text-slate-400 block">每小时流水 (Per Hour)</span>
+         <span className="text-[10px] text-slate-400 block">每小时流水</span>
          <span className="font-bold text-slate-200">
           +{inspectMetric === 'treasury' || inspectMetric === 'daily_revenue'
            ? formatChineseNumber(stats.dailyFiscalRevenue / 24, 2).shortText
@@ -758,7 +758,7 @@ export const NationalEconomyDashboard: React.FC<NationalEconomyDashboardProps> =
          </span>
         </div>
         <div className="p-2 bg-[#080d16] border border-[#182333]">
-         <span className="text-[10px] text-slate-400 block">每日 24h 产值 (Daily)</span>
+         <span className="text-[10px] text-slate-400 block">每日 24h 产值</span>
          <span className="font-bold text-amber-300">
           +{inspectMetric === 'treasury' || inspectMetric === 'daily_revenue'
            ? formatChineseNumber(stats.dailyFiscalRevenue, 2).shortText
@@ -766,7 +766,7 @@ export const NationalEconomyDashboard: React.FC<NationalEconomyDashboardProps> =
          </span>
         </div>
         <div className="p-2 bg-[#080d16] border border-[#182333]">
-         <span className="text-[10px] text-slate-400 block">年化产值 (Annualized 365d)</span>
+         <span className="text-[10px] text-slate-400 block">年化产值</span>
          <span className="font-bold text-emerald-300">
           +{inspectMetric === 'treasury' || inspectMetric === 'daily_revenue'
            ? formatChineseNumber(stats.dailyFiscalRevenue * 365, 2).shortText

@@ -167,9 +167,6 @@ export const CreatorModal: React.FC<CreatorModalProps> = ({
                       )}
                     </button>
                   </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed mt-1">
-                    创作代码为管理员提供 确认创作者身份，用于唯一识别创作者。
-                  </p>
                 </div>
 
                 {/* 创作者代号 / 笔名 */}
@@ -181,13 +178,10 @@ export const CreatorModal: React.FC<CreatorModalProps> = ({
                     type="text"
                     value={identityName}
                     onChange={(e) => setIdentityName(e.target.value)}
-                    placeholder="例如：林初霁 / 虚无漫游者"
+                    placeholder="输入代号或笔名"
                     className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition shadow-2xs"
                     required
                   />
-                  <p className="text-[11px] text-slate-400 leading-relaxed mt-1">
-                    用于填写创作者在世界网中的公开名称。
-                  </p>
                 </div>
               </div>
 

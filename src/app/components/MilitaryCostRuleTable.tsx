@@ -48,11 +48,11 @@ export const MilitaryCostRuleTable: React.FC = () => {
       <div className="flex items-center gap-2 flex-wrap">
        <h4 className="font-extrabold text-white text-sm">军事工业黄金基准产出法则</h4>
        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 whitespace-nowrap">
-        标准工业力常数 (IC)
+        标准工业力常数
        </span>
       </div>
       <p className="text-xs text-slate-300 leading-relaxed">
-       单座军事工厂 <strong className="text-amber-300 font-mono font-bold">24小时 (1天) 产出军用产能 500 点 (IC)</strong>。
+       单座军事工厂 <strong className="text-amber-300 font-mono font-bold">24小时 (1天) 产出军用产能 500 点</strong>。
        全军所有步兵轻武器、压制火炮、装甲车辆、战机与后勤装备均严格以此基准公式换算产出速率与补给周期。
       </p>
      </div>
